@@ -1,0 +1,12 @@
+{
+  "name": "student-admin-edgeone",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "AI 智慧学生管理系统 · EdgeOne Makers 全栈版（Blob 持久化 + AI Gateway）",
+  "dependencies": {
+    "@edgeone/pages-blob": "^0.0.19",
+    "bcryptjs": "^3.0.3",
+    "jsonwebtoken": "^9.0.2"
+  }
+}

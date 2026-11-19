@@ -1,0 +1,9 @@
+{
+  "buildCommand": "",
+  "outputDirectory": ".",
+  "cloudFunctions": {
+    "nodejs": {
+      "includeFiles": []
+    }
+  }
+}
