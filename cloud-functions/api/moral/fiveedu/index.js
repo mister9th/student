@@ -1,0 +1,46 @@
+/** POST /api/moral/fiveedu —— 新增五育打标记录并累加学生 fiveEdu 汇总（P1 §3.2） */
+import { S, ok, fail, json, bodyOf, nextId, now } from '../../../_lib/store.js'
+import { ensureSeeded } from '../../../_lib/seed.js'
+import { requirePermission, num } from '../../../_lib/util.js'
+import { DIMENSIONS, scoreOf, applyFiveEduDelta } from './_fiveedu.js'
+
+export async function onRequest(context) {
+  try {
+    await ensureSeeded()
+    const guard = await requirePermission(context, 'fiveedu:add')
+    if (guard instanceof Response) return guard
+    const body = await bodyOf(context.request)
+    const studentId = num(body.studentId, 0)
+    if (!studentId) return json(fail('学生不能为空', 400))
+    const dimension = String(body.dimension || '')
+    if (!DIMENSIONS.includes(dimension)) return json(fail('五育维度不合法', 400))
+    const level = num(body.level, 0)
+    if (![1, 2, 3, 4].includes(level)) return json(fail('等级不合法（1-4）', 400))
+    const semester = String(body.semester || '').trim()
+    if (!semester) return json(fail('学期不能为空', 400))
+    const tags = Array.isArray(body.tags)
+      ? body.tags.filter((t) => t !== null && t !== undefined && String(t).trim()).map((t) => String(t).trim())
+      : []
+
+    const academic = S.academic()
+    const student = await academic.get(`students/${studentId}.json`, { type: 'json' })
+    if (!student || student.deleted === 1) return json(fail('学生档案不存在', 400))
+
+    const store = S.moral()
+    const id = await nextId(store, 'fiveedu/')
+    const ts = now()
+    await store.setJSON(`fiveedu/${id}.json`, {
+      id, studentId, studentName: String(student.realName || ''),
+      classId: student.classId ?? null, className: String(student.className || ''),
+      stage: num(student.stage, 0), grade: num(student.grade, 0), semester,
+      dimension, level, tags,
+      note: String(body.note || ''),
+      teacherId: guard.id ?? guard.userId ?? null, teacherName: String(guard.realName || ''),
+      createTime: ts, updateTime: ts, deleted: 0,
+    })
+    const fiveEdu = await applyFiveEduDelta(academic, studentId, dimension, scoreOf(level))
+    return json(ok({ id, fiveEdu }))
+  } catch (e) {
+    return json(fail(e?.message || '五育打标失败', 500))
+  }
+}

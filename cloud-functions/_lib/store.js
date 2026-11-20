@@ -18,6 +18,7 @@ export const S = {
   ai: () => store('edu-ai'),            // chats, predictions, comments
   config: () => store('edu-config'),    // settings, course-categories, stats
   moral: () => store('edu-moral'),      // 德育域：rules, records（德育模块专用）
+  exam: () => store('edu-exam'),        // 考试域：exams（P1 考试实体，独立 store）
 }
 
 /** 统一响应结构，兼容前端 request.ts（code===200 取 data） */

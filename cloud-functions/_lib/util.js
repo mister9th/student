@@ -42,7 +42,12 @@ export const stripRecords = (pagedResult) => {
 
 export const enc = (s) => encodeURIComponent(String(s ?? ''))
 
-export const roleOf = (userType) => (Number(userType) === 2 ? 'ROLE_TEACHER' : Number(userType) === 1 ? 'ROLE_STUDENT' : 'ROLE_ADMIN')
+export const roleOf = (userType) => (
+  Number(userType) === 4 ? 'ROLE_GRADE_LEADER'
+    : Number(userType) === 2 ? 'ROLE_TEACHER'
+      : Number(userType) === 1 ? 'ROLE_STUDENT'
+        : 'ROLE_ADMIN'
+)
 
 export const ROLE_PERMISSIONS = {
   ROLE_ADMIN: ['*:*'],
@@ -50,17 +55,36 @@ export const ROLE_PERMISSIONS = {
     'dashboard', 'dashboard:screen', 'student', 'student:list', 'student:add', 'student:edit',
     'student:import', 'student:export', 'teacher', 'teacher:list', 'teacher:add', 'teacher:edit',
     'class', 'class:list', 'class:add', 'class:edit', 'course', 'course:list', 'course:add',
-    'course:edit', 'score', 'score:list', 'score:add', 'score:edit', 'notice', 'message',
+    'course:edit', 'score', 'score:list', 'score:add', 'score:edit', 'score:ranking', 'notice', 'message',
     'message:list', 'file', 'file:list', 'ai', 'ai:chat',
     'moral', 'moral:list', 'moral:add', 'moral:edit', 'moral:approve', 'moral:delete',
     'group', 'group:list', 'group:add', 'group:edit', 'group:delete',
     'inspection', 'inspection:list', 'inspection:add', 'inspection:edit', 'inspection:delete',
     'redflag', 'redflag:list', 'redflag:add', 'redflag:edit',
     'grade', 'grade:list', 'grade:add', 'grade:edit',
+    'exam', 'exam:list', 'exam:add', 'exam:edit', 'exam:delete',
+    'fiveedu', 'fiveedu:list', 'fiveedu:add', 'fiveedu:edit',
+    'termcomment', 'termcomment:list', 'termcomment:add', 'termcomment:edit',
+  ],
+  ROLE_GRADE_LEADER: [
+    'dashboard', 'dashboard:screen', 'student', 'student:list', 'student:add', 'student:edit',
+    'student:import', 'student:export', 'teacher', 'teacher:list', 'teacher:add', 'teacher:edit',
+    'class', 'class:list', 'class:add', 'class:edit', 'course', 'course:list', 'course:add',
+    'course:edit', 'score', 'score:list', 'score:add', 'score:edit', 'score:ranking', 'notice', 'message',
+    'message:list', 'file', 'file:list', 'ai', 'ai:chat',
+    'moral', 'moral:list', 'moral:add', 'moral:edit', 'moral:approve', 'moral:delete',
+    'group', 'group:list', 'group:add', 'group:edit', 'group:delete',
+    'inspection', 'inspection:list', 'inspection:add', 'inspection:edit', 'inspection:delete',
+    'redflag', 'redflag:list', 'redflag:add', 'redflag:edit',
+    'grade', 'grade:list', 'grade:add', 'grade:edit',
+    'exam', 'exam:list', 'exam:add', 'exam:edit', 'exam:delete',
+    'fiveedu', 'fiveedu:list', 'fiveedu:add', 'fiveedu:edit',
+    'termcomment', 'termcomment:list', 'termcomment:add', 'termcomment:edit',
+    'grade-leader',
   ],
   ROLE_STUDENT: [
     'dashboard', 'dashboard:screen', 'ai', 'ai:chat', 'message', 'message:list', 'student:list', 'score:list',
-    'moral', 'moral:list',
+    'moral', 'moral:list', 'fiveedu:list', 'termcomment:list',
   ],
 }
 export const permsOf = (userType) => ROLE_PERMISSIONS[roleOf(userType)]

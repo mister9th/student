@@ -29,19 +29,48 @@ const ROLE_DEFS = [
   { id: 1, roleName: '超级管理员', roleCode: 'ROLE_ADMIN', description: '系统超级管理员', sortOrder: 1 },
   { id: 2, roleName: '教师', roleCode: 'ROLE_TEACHER', description: '教师角色', sortOrder: 2 },
   { id: 3, roleName: '学生', roleCode: 'ROLE_STUDENT', description: '学生角色', sortOrder: 3 },
+  { id: 5, roleName: '年级组长', roleCode: 'ROLE_GRADE_LEADER', description: '年段工作+跨班级查看（P1）', sortOrder: 5 },
 ]
 
-// 教师 = 教学业务增改 + 查询；学生 = 只读
+// 教师 = 教学业务增改 + 查询；学生 = 只读；年级组长（P1）= 教师权限 ∪ 年段工作 ∪ grade-leader
+// 本对象与 _lib/util.js 的 ROLE_PERMISSIONS 全量对齐（契约 §7）；两份必须一致。
 const ROLE_PERMISSIONS = {
   ROLE_ADMIN: ['*:*'],
   ROLE_TEACHER: [
     'dashboard', 'dashboard:screen', 'student', 'student:list', 'student:add', 'student:edit',
     'student:import', 'student:export', 'teacher', 'teacher:list', 'teacher:add', 'teacher:edit',
     'class', 'class:list', 'class:add', 'class:edit', 'course', 'course:list', 'course:add',
-    'course:edit', 'score', 'score:list', 'score:add', 'score:edit', 'notice', 'message',
+    'course:edit', 'score', 'score:list', 'score:add', 'score:edit', 'score:ranking', 'notice', 'message',
     'message:list', 'file', 'file:list', 'ai', 'ai:chat',
+    'moral', 'moral:list', 'moral:add', 'moral:edit', 'moral:approve', 'moral:delete',
+    'group', 'group:list', 'group:add', 'group:edit', 'group:delete',
+    'inspection', 'inspection:list', 'inspection:add', 'inspection:edit', 'inspection:delete',
+    'redflag', 'redflag:list', 'redflag:add', 'redflag:edit',
+    'grade', 'grade:list', 'grade:add', 'grade:edit',
+    'exam', 'exam:list', 'exam:add', 'exam:edit', 'exam:delete',
+    'fiveedu', 'fiveedu:list', 'fiveedu:add', 'fiveedu:edit',
+    'termcomment', 'termcomment:list', 'termcomment:add', 'termcomment:edit',
   ],
-  ROLE_STUDENT: ['dashboard', 'dashboard:screen', 'ai', 'ai:chat', 'message', 'message:list', 'student:list', 'score:list'],
+  ROLE_GRADE_LEADER: [
+    'dashboard', 'dashboard:screen', 'student', 'student:list', 'student:add', 'student:edit',
+    'student:import', 'student:export', 'teacher', 'teacher:list', 'teacher:add', 'teacher:edit',
+    'class', 'class:list', 'class:add', 'class:edit', 'course', 'course:list', 'course:add',
+    'course:edit', 'score', 'score:list', 'score:add', 'score:edit', 'score:ranking', 'notice', 'message',
+    'message:list', 'file', 'file:list', 'ai', 'ai:chat',
+    'moral', 'moral:list', 'moral:add', 'moral:edit', 'moral:approve', 'moral:delete',
+    'group', 'group:list', 'group:add', 'group:edit', 'group:delete',
+    'inspection', 'inspection:list', 'inspection:add', 'inspection:edit', 'inspection:delete',
+    'redflag', 'redflag:list', 'redflag:add', 'redflag:edit',
+    'grade', 'grade:list', 'grade:add', 'grade:edit',
+    'exam', 'exam:list', 'exam:add', 'exam:edit', 'exam:delete',
+    'fiveedu', 'fiveedu:list', 'fiveedu:add', 'fiveedu:edit',
+    'termcomment', 'termcomment:list', 'termcomment:add', 'termcomment:edit',
+    'grade-leader',
+  ],
+  ROLE_STUDENT: [
+    'dashboard', 'dashboard:screen', 'ai', 'ai:chat', 'message', 'message:list', 'student:list', 'score:list',
+    'moral', 'moral:list', 'fiveedu:list', 'termcomment:list',
+  ],
 }
 
 const ALL_PERMISSION_CODES = [
@@ -51,11 +80,48 @@ const ALL_PERMISSION_CODES = [
   'class:delete', 'course:add', 'course:edit', 'course:delete', 'score:add', 'score:edit',
   'score:delete', 'system:config', 'student:list', 'teacher:list', 'class:list', 'course:list',
   'score:list', 'message:list', 'file:list',
+  'exam', 'exam:list', 'exam:add', 'exam:edit', 'exam:delete', 'score:ranking',
+  'fiveedu', 'fiveedu:list', 'fiveedu:add', 'fiveedu:edit',
+  'grade-leader',
+  'termcomment', 'termcomment:list', 'termcomment:add', 'termcomment:edit',
 ]
 
-const roleOf = (userType) => (userType === 2 ? 'ROLE_TEACHER' : userType === 1 ? 'ROLE_STUDENT' : 'ROLE_ADMIN')
+const roleOf = (userType) => (
+  Number(userType) === 4 ? 'ROLE_GRADE_LEADER'
+    : Number(userType) === 2 ? 'ROLE_TEACHER'
+      : Number(userType) === 1 ? 'ROLE_STUDENT'
+        : 'ROLE_ADMIN'
+)
 const permsOf = (userType) => ROLE_PERMISSIONS[roleOf(userType)]
 const pad2 = (n) => String(n).padStart(2, '0')
+
+/** P1：2 名年级组长演示用户定义（seed 与 ensure-grade-leaders 迁移共用的唯一来源） */
+export const GRADE_LEADER_USERS = [
+  { id: 3001, username: 'gradeleader1', realName: '李年级(初一)', userType: 4, email: 'gradeleader1@deyu.edu.cn', phone: '13800003001', gender: 1, manageGrades: [7, 8, 9] },
+  { id: 3002, username: 'gradeleader2', realName: '王年级(高一)', userType: 4, email: 'gradeleader2@deyu.edu.cn', phone: '13800003002', gender: 2, manageGrades: [10, 11, 12] },
+]
+
+/** 由账号定义构造用户文档（seed 与迁移端点共用，保证字段/口令/权限完全一致） */
+export function buildUserDoc(o) {
+  return {
+    id: o.id,
+    username: o.username,
+    password: PWD_HASH,
+    realName: o.realName,
+    email: o.email || '',
+    phone: o.phone || '',
+    avatar: '',
+    gender: o.gender || 0,
+    userType: o.userType,
+    status: o.status === undefined ? 1 : o.status,
+    deleted: 0,
+    roles: [roleOf(o.userType)],
+    permissions: permsOf(o.userType),
+    createTime: '2024-08-01 09:00:00',
+    updateTime: '2024-08-01 09:00:00',
+    ...(o.manageGrades !== undefined ? { manageGrades: o.manageGrades } : {}),
+  }
+}
 
 // K12：班级 = [名称, stage(1小学/2初中/3高中), grade(1-12)]
 const classSeed = [
@@ -171,23 +237,7 @@ async function writeSeed() {
   // ---- 用户（管理员 + 演示账号 + 10 教师 + 24 学生，密码 123456）----
   const userDocs = []
   const addUser = (o) => {
-    const doc = {
-      id: o.id,
-      username: o.username,
-      password: PWD_HASH,
-      realName: o.realName,
-      email: o.email || '',
-      phone: o.phone || '',
-      avatar: '',
-      gender: o.gender || 0,
-      userType: o.userType,
-      status: o.status === undefined ? 1 : o.status,
-      deleted: 0,
-      roles: [roleOf(o.userType)],
-      permissions: permsOf(o.userType),
-      createTime: '2024-08-01 09:00:00',
-      updateTime: '2024-08-01 09:00:00',
-    }
+    const doc = buildUserDoc(o)
     const enc = encodeURIComponent(o.username)
     add(auth, `user-by-name/${enc}.json`, { id: o.id, username: o.username })
     sentinel(auth, `username/${enc}`)
@@ -197,6 +247,8 @@ async function writeSeed() {
   addUser({ id: 1, username: 'admin', realName: '系统管理员', userType: 3, email: 'admin@deyu.edu.cn', phone: '13800000000', gender: 1 })
   addUser({ id: 1100, username: 'stu_zs', realName: '张三丰', userType: 1, email: 'stu_zs@stu.deyu.edu.cn', phone: '13900010001', gender: 1 })
   addUser({ id: 2100, username: 'zhangsan', realName: '张三', userType: 2, email: 'zhangsan@deyu.edu.cn', phone: '13800001001', gender: 1 })
+  // P1：2 名年级组长演示用户（定义来自 GRADE_LEADER_USERS，迁移端点复用同一来源）
+  GRADE_LEADER_USERS.forEach(addUser)
 
   teacherNames.forEach((name, i) => {
     addUser({
