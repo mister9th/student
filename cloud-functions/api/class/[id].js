@@ -1,7 +1,10 @@
-/** GET/PUT/DELETE /api/class/{id} */
+/** GET/PUT/DELETE /api/class/{id}（K12：stage/grade 为 1-12 整数，去 major/department） */
 import { S, ok, fail, json, bodyOf, now } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
 import { val, num, strip } from '../../_lib/util.js'
+
+const validStage = (v) => [1, 2, 3].includes(num(v, 0))
+const validGrade = (v) => num(v, 0) >= 1 && num(v, 0) <= 12
 
 export async function onRequest(context) {
   try {
@@ -21,6 +24,10 @@ export async function onRequest(context) {
     }
     if (method === 'PUT') {
       const body = await bodyOf(context.request)
+      const stage = body.stage !== undefined ? num(body.stage, doc.stage) : doc.stage
+      const grade = body.grade !== undefined ? num(body.grade, doc.grade) : doc.grade
+      if (body.stage !== undefined && !validStage(stage)) return json(fail('学段不合法（1=小学 2=初中 3=高中）', 400))
+      if (body.grade !== undefined && !validGrade(grade)) return json(fail('年级不合法（1-12）', 400))
       const headTeacherId = body.headTeacherId !== undefined ? val(body.headTeacherId, null) : doc.headTeacherId
       let headTeacherName = doc.headTeacherName || ''
       if (body.headTeacherId !== undefined) {
@@ -30,9 +37,7 @@ export async function onRequest(context) {
       await store.setJSON(key, {
         ...doc,
         className: body.className !== undefined ? String(body.className || '') : doc.className,
-        grade: body.grade !== undefined ? String(body.grade || '') : doc.grade,
-        major: body.major !== undefined ? String(body.major || '') : doc.major,
-        department: body.department !== undefined ? String(body.department || '') : doc.department,
+        stage, grade,
         headTeacherId, headTeacherName,
         maxStudent: body.maxStudent !== undefined ? num(body.maxStudent, 50) : doc.maxStudent,
         status: body.status !== undefined ? num(body.status, 1) : doc.status,

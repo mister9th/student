@@ -46,7 +46,7 @@ export async function onRequest(context) {
     const riskItems = []
     for (const s of lowScores) {
       const sid = num(pick(s, 'studentId', 'student_id'), 0)
-      const cid = num(pick(s, 'courseId', 'course_id'), 0)
+      const cid = num(pick(s, 'courseId', 'course_id', 'subjectId'), 0)
       const score = scoreValue(s)
       const stu = students.get(sid)
       const classId = num(pick(stu, 'classId', 'class_id'), 0)

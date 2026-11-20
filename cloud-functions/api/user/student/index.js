@@ -30,9 +30,14 @@ export async function onRequest(context) {
     const sid = await nextId(academic, 'students/')
     const classId = val(body.classId, null)
     let className = ''
+    let stage = val(body.stage, null)
+    let grade = val(body.grade, null)
     if (classId !== null) {
       const cls = await academic.get(`classes/${classId}.json`, { type: 'json' })
       className = cls?.className || ''
+      // 班级提供时冗余学段/年级（body 显式传值优先）
+      stage = body.stage !== undefined ? val(body.stage, stage) : (cls?.stage ?? stage)
+      grade = body.grade !== undefined ? val(body.grade, grade) : (cls?.grade ?? grade)
     }
     const ts = now()
     const realName = String(body.realName || '')
@@ -46,9 +51,9 @@ export async function onRequest(context) {
     }
     const student = {
       id: sid, userId: uid, username, realName, studentNo, classId, className,
-      grade: String(body.grade || ''), major: String(body.major || ''), email, phone, gender,
+      stage, grade, email, phone, gender,
       avatar: '', status: 1, enrollmentYear: val(body.enrollmentYear, null),
-      createTime: ts, deleted: 0,
+      createTime: ts, updateTime: ts, deleted: 0,
     }
     await Promise.all([
       auth.setJSON(`users/${uid}.json`, user),

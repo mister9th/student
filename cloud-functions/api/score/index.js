@@ -1,7 +1,13 @@
-/** POST /api/score —— 录入成绩（总评 = 平时*0.2 + 期中*0.3 + 期末*0.5） */
+/** POST /api/score —— 录入成绩（K12 单考次模型：学生 × 考试次数 × 科目直录直显） */
 import { S, ok, fail, json, bodyOf, nextId, now } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
-import { num, gradeOf, pointOf } from '../../_lib/util.js'
+import { num, k12GradeOf, currentSemester } from '../../_lib/util.js'
+
+const pad2 = (n) => String(n).padStart(2, '0')
+const today = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+}
 
 export async function onRequest(context) {
   try {
@@ -9,35 +15,32 @@ export async function onRequest(context) {
     const body = await bodyOf(context.request)
     const store = S.academic()
     const studentId = num(body.studentId, 0)
-    const courseId = num(body.courseId, 0)
+    const subjectId = num(body.subjectId, 0)
+    if (!studentId) return json(fail('学生不能为空', 400))
+    if (!subjectId) return json(fail('科目不能为空', 400))
+    const examName = String(body.examName || '').trim()
+    if (!examName) return json(fail('考试名称不能为空', 400))
+    const score = num(body.score, NaN)
+    if (!Number.isFinite(score) || score < 0 || score > 100) return json(fail('分数需在 0-100 之间', 400))
+    const examType = body.examType === undefined || body.examType === null || body.examType === '' ? 3 : num(body.examType, 0)
+    if (examType < 1 || examType > 5) return json(fail('考试类型不合法（1-5）', 400))
+    const examDate = String(body.examDate || '').trim() || today()
+
+    // 学生/班级/科目不存在时宽松处理：冗余名查不到置空
     const student = await store.get(`students/${studentId}.json`, { type: 'json' })
-    const course = await store.get(`courses/${courseId}.json`, { type: 'json' })
-
-    const usual = num(body.usualScore, 0)
-    const final = num(body.finalScore, 0)
-    const mid = body.midtermScore === null || body.midtermScore === undefined || body.midtermScore === ''
-      ? Math.round((usual + final) / 2)
-      : num(body.midtermScore, 0)
-    const total = Math.round(usual * 0.2 + mid * 0.3 + final * 0.5)
-    const gp = pointOf(total)
+    const subject = await store.get(`courses/${subjectId}.json`, { type: 'json' })
+    const semester = String(body.semester || '').trim() || subject?.semester || currentSemester()
     const id = await nextId(store, 'scores/')
+    const ts = now()
     await store.setJSON(`scores/${id}.json`, {
-      id, courseId, courseName: course?.courseName || '', studentId,
-      studentName: student?.realName || '', usualScore: usual, midtermScore: mid, finalScore: final,
-      totalScore: total, gradePoint: gp, gradeLevel: gradeOf(total),
-      semester: course?.semester || '', teacherId: course?.teacherId || null,
-      comment: String(body.comment || ''), createTime: now(), deleted: 0,
+      id, studentId, studentName: student?.realName || '',
+      classId: student?.classId ?? null, className: student?.className || '',
+      subjectId, subjectName: subject?.courseName || '',
+      examName, examType, examDate, semester,
+      score, gradeLevel: k12GradeOf(score),
+      teacherId: subject?.teacherId ?? null, comment: String(body.comment || ''),
+      createTime: ts, updateTime: ts, deleted: 0,
     })
-
-    // 同步选课记录（存在则更新，无则跳过；Blob 无 SQL LIKE）
-    const { blobs } = await store.list({ prefix: 'selections/' })
-    for (const b of blobs) {
-      const sel = await store.get(b.key, { type: 'json' })
-      if (sel && sel.deleted !== 1 && Number(sel.courseId) === courseId && Number(sel.studentId) === studentId) {
-        await store.setJSON(b.key, { ...sel, score: total, gradePoint: gp })
-        break
-      }
-    }
     return json(ok({ id }))
   } catch (e) {
     return json(fail(e?.message || '录入成绩失败', 500))

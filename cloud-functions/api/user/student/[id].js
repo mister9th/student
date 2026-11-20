@@ -46,10 +46,13 @@ export async function onRequest(context) {
         next.classId = val(body.classId, null)
         const cls = next.classId !== null ? await academic.get(`classes/${next.classId}.json`, { type: 'json' }) : null
         next.className = cls?.className || ''
+        // 班级提供时冗余学段/年级（body 显式传值优先）
+        next.stage = body.stage !== undefined ? val(body.stage, next.stage) : (cls?.stage ?? next.stage)
+        next.grade = body.grade !== undefined ? val(body.grade, next.grade) : (cls?.grade ?? next.grade)
       }
       if (body.realName !== undefined) next.realName = String(body.realName || '')
-      if (body.grade !== undefined) next.grade = String(body.grade || '')
-      if (body.major !== undefined) next.major = String(body.major || '')
+      if (body.stage !== undefined && body.classId === undefined) next.stage = val(body.stage, next.stage)
+      if (body.grade !== undefined && body.classId === undefined) next.grade = num(body.grade, num(next.grade, 0))
       if (body.email !== undefined) next.email = String(body.email || '')
       if (body.phone !== undefined) next.phone = String(body.phone || '')
       if (body.gender !== undefined) next.gender = num(body.gender, 0)

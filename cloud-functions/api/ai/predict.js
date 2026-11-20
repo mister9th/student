@@ -35,7 +35,7 @@ export async function onRequest(context) {
       ? Math.round(valid.reduce((a, b) => a + b, 0) / valid.length)
       : 75
 
-    const thisScoreDoc = scores.find((s) => num(pick(s, 'courseId', 'course_id'), 0) === courseId) || scores[0]
+    const thisScoreDoc = scores.find((s) => num(pick(s, 'courseId', 'course_id', 'subjectId'), 0) === courseId) || scores[0]
     const thisScore = thisScoreDoc ? scoreValue(thisScoreDoc) : historyAvg
 
     const name = await studentName(studentId, studentDoc, thisScoreDoc)

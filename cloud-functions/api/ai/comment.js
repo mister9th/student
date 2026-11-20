@@ -35,7 +35,7 @@ export async function onRequest(context) {
 
     const courses = await courseMap()
     const courseNames = scores
-      .map((s) => courseName(courses.get(num(pick(s, 'courseId', 'course_id'), 0)), s))
+      .map((s) => courseName(courses.get(num(pick(s, 'courseId', 'course_id', 'subjectId'), 0)), s))
       .filter(Boolean)
 
     // 规则兜底评语（基于真实总评）

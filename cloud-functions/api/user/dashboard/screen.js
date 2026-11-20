@@ -11,12 +11,13 @@ async function allOf(store, prefix) {
   return items.filter((x) => x && x.deleted !== 1)
 }
 
-const bandOf = (s) => (s >= 90 ? '优秀' : s >= 80 ? '良好' : s >= 70 ? '中等' : s >= 60 ? '及格' : '不及格')
+const bandOf = (s) => (s >= 85 ? '优秀' : s >= 75 ? '良好' : s >= 60 ? '合格' : '待提高')
 const categoryOf = (name) => {
   const n = String(name || '')
-  if (/计算机|数据|软件/.test(n)) return '计算机类'
-  if (/数学/.test(n)) return '数学类'
-  if (/英语|外语/.test(n)) return '外语类'
+  if (/语|数|英|道法|科学/.test(n)) return '文化课'
+  if (/物理|化学|生物/.test(n)) return '理科'
+  if (/历史|地理|政治/.test(n)) return '文科'
+  if (/音乐|体育|信息|美术|劳动/.test(n)) return '素养课'
   return '其他'
 }
 
@@ -30,15 +31,15 @@ export async function onRequest(context) {
     ])
 
     const pass = scores.length
-      ? Math.round(scores.filter((s) => num(s.totalScore, 0) >= 60).length * 1000 / scores.length) / 10
+      ? Math.round(scores.filter((s) => num(s.score, 0) >= 60).length * 1000 / scores.length) / 10
       : 0
 
     const scoreBands = {}
     for (const s of scores) {
-      const b = bandOf(num(s.totalScore, 0))
+      const b = bandOf(num(s.score, 0))
       scoreBands[b] = (scoreBands[b] || 0) + 1
     }
-    const scoreDistribution = ['优秀', '良好', '中等', '及格', '不及格']
+    const scoreDistribution = ['优秀', '良好', '合格', '待提高']
       .filter((k) => scoreBands[k] > 0).map((k) => ({ name: k, value: scoreBands[k] }))
 
     const courseBands = {}
@@ -54,7 +55,7 @@ export async function onRequest(context) {
     for (const s of scores) {
       const m = Number(String(s.createTime || '').slice(5, 7)) || 0
       if (!m) continue
-      monthSum[m] = (monthSum[m] || 0) + num(s.totalScore, 0)
+      monthSum[m] = (monthSum[m] || 0) + num(s.score, 0)
       monthCnt[m] = (monthCnt[m] || 0) + 1
     }
 

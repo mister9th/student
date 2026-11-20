@@ -7,6 +7,7 @@
  */
 import bcrypt from 'bcryptjs'
 import { S, now } from './store.js'
+import { k12GradeOf } from './k12.js'
 
 const PWD_HASH = bcrypt.hashSync('123456', 10)
 
@@ -55,19 +56,18 @@ const ALL_PERMISSION_CODES = [
 const roleOf = (userType) => (userType === 2 ? 'ROLE_TEACHER' : userType === 1 ? 'ROLE_STUDENT' : 'ROLE_ADMIN')
 const permsOf = (userType) => ROLE_PERMISSIONS[roleOf(userType)]
 const pad2 = (n) => String(n).padStart(2, '0')
-const gradeOf = (score) => (score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : score >= 60 ? 'D' : 'E')
-const pointOf = (score) => Number((score >= 60 ? (score - 50) / 10 : 0).toFixed(1))
 
+// K12：班级 = [名称, stage(1小学/2初中/3高中), grade(1-12)]
 const classSeed = [
-  ['计算机2201班', '2022', '计算机科学与技术', '信息工程学院'],
-  ['计算机2202班', '2022', '计算机科学与技术', '信息工程学院'],
-  ['软件工程2301班', '2023', '软件工程', '软件学院'],
-  ['电子信息2301班', '2023', '电子信息工程', '电子工程学院'],
-  ['人工智能2401班', '2024', '人工智能', '信息工程学院'],
-  ['数据科学2401班', '2024', '数据科学与大数据技术', '信息工程学院'],
+  ['三年级(1)班', 1, 3], ['三年级(2)班', 1, 3],
+  ['初一(1)班', 2, 7], ['初一(2)班', 2, 7],
+  ['高一(1)班', 3, 10], ['高一(2)班', 3, 10],
 ]
+// 班级入学年份：以 2024 秋季为基准，按学段入口年级（1/7/10）回推
+const enrollmentYearOf = (stage, grade) => 2024 - (grade - (stage === 1 ? 1 : stage === 2 ? 7 : 10))
 const teacherNames = ['张伟', '李娜', '王强', '刘敏', '陈建国', '杨丽', '赵磊', '孙静', '周涛', '吴芳']
-const departments = ['信息工程学院', '软件学院', '电子工程学院', '理学院', '外国语学院']
+// department 字段语义为「任教学科」（K12 无院系概念）
+const subjects = ['语文', '数学', '英语', '物理', '化学', '生物学', '道德与法治', '历史', '地理', '信息科技']
 const titles = ['教授', '副教授', '讲师', '讲师', '副教授', '教授', '讲师', '助教', '副教授', '讲师']
 const degrees = ['博士', '硕士', '硕士', '博士', '硕士', '博士', '硕士', '本科', '博士', '硕士']
 const studentNames = [
@@ -76,12 +76,13 @@ const studentNames = [
   '胡博文', '朱雨萱', '高梓涵', '林泽宇', '何欣妍', '郭俊杰',
   '马思琪', '罗天佑', '梁诗涵', '宋子墨', '谢雨欣', '唐皓轩',
 ]
+// K12 课程 12 门：[科目名, stage]（小学 6 门 + 初中 2 门 + 高中 4 门演示）
 const courseSeed = [
-  ['高等数学', 'MATH001', 4], ['线性代数', 'MATH002', 3], ['概率论与数理统计', 'MATH003', 3],
-  ['大学英语', 'ENG001', 2], ['数据结构', 'CS001', 4], ['操作系统', 'CS002', 4],
-  ['计算机网络', 'CS003', 3], ['数据库原理', 'CS004', 3], ['机器学习', 'AI001', 3],
-  ['人工智能导论', 'AI002', 2], ['软件工程', 'SE001', 3], ['编译原理', 'CS005', 3],
+  ['语文', 1], ['数学', 1], ['英语', 1], ['道德与法治', 1], ['科学', 1], ['信息科技', 1],
+  ['物理', 2], ['化学', 2],
+  ['生物学', 3], ['历史', 3], ['地理', 3], ['信息技术', 3],
 ]
+const gradeScopeOf = (stage) => (stage === 1 ? '1-6年级' : stage === 2 ? '7-9年级' : '10-12年级')
 const noticeTitles = [
   '关于2024-2025学年第二学期开学安排的通知', '2025年春季运动会报名启动', '图书馆开放时间调整公告',
   '关于举办校园文化艺术节的通知', '期末考试安排及考场查询', '国家奖学金评选结果公示',
@@ -233,7 +234,7 @@ async function writeSeed() {
     const teacherNo = `T${String(1001 + i)}`
     add(academic, `teachers/${i + 1}.json`, {
       id: i + 1, userId: uid, teacherNo, username: `teacher${i + 1}`, realName: name,
-      department: departments[i % departments.length], title: titles[i], degree: degrees[i],
+      department: subjects[i % subjects.length], title: titles[i], degree: degrees[i],
       specialty: `${titles[i]}，主要从事教学与科研工作`, entryDate: '2020-09-01',
       phone: `139${String(10000000 + i * 246813).slice(0, 8)}`, email: `teacher${i + 1}@deyu.edu.cn`,
       gender: i % 2 === 0 ? 1 : 2, status: i === 9 ? 0 : 1, avatar: '',
@@ -242,64 +243,63 @@ async function writeSeed() {
     sentinel(academic, `teacher-no/${encodeURIComponent(teacherNo)}`)
   })
 
-  // ---- 班级 6 条 ----
-  classSeed.forEach(([className, grade, major, department], i) => {
+  // ---- 班级 6 条（K12：stage/grade 整数年级，无 major/department）----
+  classSeed.forEach(([className, stage, grade], i) => {
     add(academic, `classes/${i + 1}.json`, {
-      id: i + 1, className, grade, major, department,
+      id: i + 1, className, stage, grade,
       headTeacherId: 2001 + i, headTeacherName: teacherNames[i], monitorId: null,
-      studentCount: 28 + ((i * 3) % 12), maxStudent: 50, status: i >= 4 ? 1 : 0,
-      enrollmentYear: Number(grade), createTime: '2024-09-01 08:00:00', deleted: 0,
+      studentCount: 4, maxStudent: 50, status: 1,
+      enrollmentYear: enrollmentYearOf(stage, grade), createTime: '2024-09-01 08:00:00', deleted: 0,
     })
   })
 
-  // ---- 学生档案 24 条 ----
+  // ---- 学生档案 24 条（grade=所在班年级、stage=所在班学段，无 major）----
   studentNames.forEach((name, i) => {
-    const cls = classSeed[i % classSeed.length]
-    const studentNo = `${cls[1]}${String(1001 + i)}`
+    const [className, stage, grade] = classSeed[i % classSeed.length]
+    const ey = enrollmentYearOf(stage, grade)
+    const studentNo = `${ey}${String(1001 + i)}`
     add(academic, `students/${i + 1}.json`, {
       id: i + 1, userId: 1001 + i, username: `student${String(i + 1).padStart(2, '0')}`,
-      realName: name, studentNo, classId: (i % classSeed.length) + 1, className: cls[0],
-      grade: cls[1], major: cls[2], email: `student${i + 1}@stu.deyu.edu.cn`,
+      realName: name, studentNo, classId: (i % classSeed.length) + 1, className,
+      stage, grade, email: `student${i + 1}@stu.deyu.edu.cn`,
       phone: studentPhones[i], gender: i % 3 === 0 ? 2 : 1, avatar: '',
-      status: i === 21 ? 0 : 1, enrollmentYear: Number(cls[1]),
+      status: i === 21 ? 0 : 1, enrollmentYear: ey,
       createTime: `2024-09-01 09:${pad2(10 + (i % 49))}:00`, deleted: 0,
     })
     sentinel(academic, `student-no/${encodeURIComponent(studentNo)}`)
   })
 
-  // ---- 课程 12 条 ----
-  courseSeed.forEach(([courseName, courseCode, credit], i) => {
+  // ---- 课程 12 条（K12：stage/gradeScope，无 courseCode/credit/selectedCount；status 0未开始/1进行中/2已结课）----
+  courseSeed.forEach(([courseName, stage], i) => {
     const ti = i % teacherNames.length
     add(academic, `courses/${i + 1}.json`, {
-      id: i + 1, courseName, courseCode, teacherId: 2001 + ti, teacherName: teacherNames[ti],
-      credit, semester: i % 2 === 0 ? '2024-2025-1' : '2024-2025-2',
-      selectedCount: 25 + ((i * 7) % 40), maxStudent: 80, status: i % 4,
+      id: i + 1, courseName, teacherId: 2001 + ti, teacherName: teacherNames[ti],
+      stage, gradeScope: gradeScopeOf(stage),
+      semester: i % 2 === 0 ? '2024-2025-1' : '2024-2025-2',
+      maxStudent: 80, status: i % 3,
       createTime: '2024-08-20 10:00:00', deleted: 0,
     })
   })
 
-  // ---- 选课 + 成绩 72 条（冗余展示字段，避免 JOIN）----
+  // ---- 成绩 72 条（K12 单考次模型，冗余展示字段避免 JOIN；不再生成 selections）----
   for (let i = 0; i < studentNames.length; i++) {
     for (let j = 0; j < 3; j++) {
-      const course = courseSeed[(i + j) % courseSeed.length]
-      const courseId = ((i + j) % courseSeed.length) + 1
+      const ci = (i + j) % courseSeed.length
+      const [courseName, courseStage] = courseSeed[ci]
+      const subjectId = ci + 1
       const id = i * 3 + j + 1
-      const usual = 70 + ((i * 7 + j * 13) % 30)
-      const final = 62 + ((i * 11 + j * 17) % 38)
-      const mid = Math.round((usual + final) / 2)
-      const total = Math.round(usual * 0.2 + mid * 0.3 + final * 0.5)
-      const gp = pointOf(total)
+      const score = 70 + ((i * 7 + j * 13) % 30)
+      const cls = classSeed[i % classSeed.length]
       add(academic, `scores/${id}.json`, {
-        id, courseId, courseName: course[0], studentId: i + 1, studentName: studentNames[i],
-        usualScore: usual, midtermScore: mid, finalScore: final, totalScore: total,
-        gradePoint: gp, gradeLevel: gradeOf(total),
-        semester: (courseId - 1) % 2 === 0 ? '2024-2025-1' : '2024-2025-2',
-        teacherId: 2001 + ((courseId - 1) % teacherNames.length),
-        ranking: (i % 20) + 1, comment: `${course[0]}课程表现良好`,
+        id, studentId: i + 1, studentName: studentNames[i],
+        classId: (i % classSeed.length) + 1, className: cls[0],
+        subjectId, subjectName: courseName,
+        examName: '2024-2025学年第一学期期末考试', examType: 3, examDate: '2025-01-15',
+        semester: '2024-2025-1',
+        score, gradeLevel: k12GradeOf(score),
+        teacherId: 2001 + (ci % teacherNames.length),
+        comment: `${courseName}课程表现良好`,
         createTime: '2025-01-15 14:30:00', deleted: 0,
-      })
-      add(academic, `selections/${id}.json`, {
-        id, courseId, studentId: i + 1, status: 2, score: total, gradePoint: gp, deleted: 0,
       })
     }
   }

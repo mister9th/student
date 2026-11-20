@@ -10,8 +10,8 @@ export const num = (v, def = 0) => {
 
 export const val = (v, def = null) => (v === undefined || v === null || v === '' ? def : v)
 
-export const gradeOf = (score) => (score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : score >= 60 ? 'D' : 'E')
-export const pointOf = (score) => Number((score >= 60 ? (score - 50) / 10 : 0).toFixed(1))
+/** K12 等级映射（优秀/良好/合格/待提高）与学期推算，实现见 _lib/k12.js */
+export { k12GradeOf, k12GradeOf as gradeOf, currentSemester } from './k12.js'
 
 /** 响应中去掉内部逻辑删标记 */
 export const strip = (obj) => {

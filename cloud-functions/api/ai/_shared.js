@@ -161,7 +161,7 @@ export async function studentName(studentId, studentDoc = null, scoreDoc = null)
 export function courseName(courseDoc, scoreDoc = null) {
   return String(
     pick(courseDoc, 'courseName', 'course_name', 'name') ||
-    pick(scoreDoc, 'courseName', 'course_name') ||
+    pick(scoreDoc, 'courseName', 'course_name', 'subjectName') ||
     ''
   )
 }
