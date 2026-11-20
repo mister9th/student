@@ -1,7 +1,7 @@
 /**
  * 云函数公共小工具（仅依赖 _lib/store.js 与已声明依赖）
  */
-import { S, verifyToken, jwtSecret, pageOf } from './store.js'
+import { S, fail, json, verifyToken, jwtSecret, pageOf } from './store.js'
 
 export const num = (v, def = 0) => {
   const n = Number(v)
@@ -52,8 +52,15 @@ export const ROLE_PERMISSIONS = {
     'class', 'class:list', 'class:add', 'class:edit', 'course', 'course:list', 'course:add',
     'course:edit', 'score', 'score:list', 'score:add', 'score:edit', 'notice', 'message',
     'message:list', 'file', 'file:list', 'ai', 'ai:chat',
+    'moral', 'moral:list', 'moral:add', 'moral:edit', 'moral:approve',
+    'group', 'group:list', 'group:add', 'group:edit',
+    'inspection', 'inspection:list', 'inspection:add', 'inspection:edit',
+    'redflag', 'redflag:list', 'grade', 'grade:list',
   ],
-  ROLE_STUDENT: ['dashboard', 'dashboard:screen', 'ai', 'ai:chat', 'message', 'message:list', 'student:list', 'score:list'],
+  ROLE_STUDENT: [
+    'dashboard', 'dashboard:screen', 'ai', 'ai:chat', 'message', 'message:list', 'student:list', 'score:list',
+    'moral', 'moral:list',
+  ],
 }
 export const permsOf = (userType) => ROLE_PERMISSIONS[roleOf(userType)]
 
@@ -68,6 +75,18 @@ export async function currentUser(context) {
   const user = await S.auth().get(`users/${uid}.json`, { type: 'json' })
   if (user && user.deleted !== 1) return user
   return { ...claims, id: uid, userId: uid }
+}
+
+/**
+ * 服务端 RBAC 守卫：未登录返回 401，无权限返回 403，放行返回 user。
+ * 返回值为 user 或 Response，调用方用 `guard instanceof Response` 判断并直接 return。
+ */
+export async function requirePermission(context, permCode) {
+  const user = await currentUser(context)
+  if (!user) return json(fail('未登录', 401), 401)
+  const perms = Array.isArray(user.permissions) ? user.permissions : []
+  if (perms.includes('*:*') || perms.includes(permCode)) return user
+  return json(fail('无权限', 403), 403)
 }
 
 /** 根据文件名推断 Content-Type */

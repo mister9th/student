@@ -3,7 +3,7 @@
  * ------------------------------------------------------------------
  * EdgeOne 无托管数据库，Blob 即数据库。key 前缀即 schema。
  * 所有 store 使用 strong 一致性（写入后立即可读）。
- * 6 个 store 按域拆分，避免单一 store 过热。
+ * 7 个 store 按域拆分，避免单一 store 过热。
  */
 import { getStore } from '@edgeone/pages-blob'
 
@@ -17,6 +17,7 @@ export const S = {
   logs: () => store('edu-logs'),        // oper logs
   ai: () => store('edu-ai'),            // chats, predictions, comments
   config: () => store('edu-config'),    // settings, course-categories, stats
+  moral: () => store('edu-moral'),      // 德育域：rules, records（德育模块专用）
 }
 
 /** 统一响应结构，兼容前端 request.ts（code===200 取 data） */
