@@ -9,8 +9,11 @@ export async function onRequest(context) {
     const user = await currentUser(context)
     if (!user) return json(fail('未登录或登录已过期', 401))
     const roles = Array.isArray(user.roles) && user.roles.length ? user.roles : [roleOf(user.userType)]
-    const permissions = Array.isArray(user.permissions) && user.permissions.length
-      ? user.permissions : permsOf(user.userType)
+    // 与 login.js 保持一致：旧快照补齐角色权限，避免德育等新模块按钮不渲染。
+    const permissions = Array.from(new Set([
+      ...(Array.isArray(user.permissions) ? user.permissions : []),
+      ...(permsOf(user.userType) || []),
+    ]))
     return json(ok({
       id: user.id,
       userId: user.id,

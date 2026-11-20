@@ -15,9 +15,9 @@ export async function onRequest(context) {
     for (const b of blobs) {
       const user = await auth.get(b.key, { type: 'json' })
       if (!user || user.deleted === 1) continue
-      const perms = permsOf(user.userType)
-      if (!perms) continue
       const old = Array.isArray(user.permissions) ? user.permissions : []
+      // 取并集而非直接覆盖：补齐新增模块权限，同时保留自定义权限。
+      const perms = Array.from(new Set([...old, ...(permsOf(user.userType) || [])]))
       const unchanged = old.length === perms.length && perms.every((p) => old.includes(p))
       if (unchanged) continue
       await auth.setJSON(b.key, { ...user, permissions: perms, updateTime: now() })

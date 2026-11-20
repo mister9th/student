@@ -26,8 +26,13 @@ export async function onRequest(context) {
     }
 
     const roles = Array.isArray(user.roles) && user.roles.length ? user.roles : [roleOf(user.userType)]
-    const permissions = Array.isArray(user.permissions) && user.permissions.length
-      ? user.permissions : permsOf(user.userType)
+    // 用户文档里的 permissions 是登录时写入的快照，新增模块（如 moral:*）
+    // 不会自动出现在旧快照中。这里与角色权限取并集，保证老用户重新登录后
+    // 立即获得新模块权限，同时保留可能存在的自定义权限。
+    const permissions = Array.from(new Set([
+      ...(Array.isArray(user.permissions) ? user.permissions : []),
+      ...(permsOf(user.userType) || []),
+    ]))
     const token = await signToken({
       id: user.id,
       userId: user.id,

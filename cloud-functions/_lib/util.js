@@ -52,7 +52,7 @@ export const ROLE_PERMISSIONS = {
     'class', 'class:list', 'class:add', 'class:edit', 'course', 'course:list', 'course:add',
     'course:edit', 'score', 'score:list', 'score:add', 'score:edit', 'notice', 'message',
     'message:list', 'file', 'file:list', 'ai', 'ai:chat',
-    'moral', 'moral:list', 'moral:add', 'moral:edit', 'moral:approve',
+    'moral', 'moral:list', 'moral:add', 'moral:edit', 'moral:approve', 'moral:delete',
     'group', 'group:list', 'group:add', 'group:edit',
     'inspection', 'inspection:list', 'inspection:add', 'inspection:edit',
     'redflag', 'redflag:list', 'grade', 'grade:list',
