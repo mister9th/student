@@ -53,9 +53,10 @@ export const ROLE_PERMISSIONS = {
     'course:edit', 'score', 'score:list', 'score:add', 'score:edit', 'notice', 'message',
     'message:list', 'file', 'file:list', 'ai', 'ai:chat',
     'moral', 'moral:list', 'moral:add', 'moral:edit', 'moral:approve', 'moral:delete',
-    'group', 'group:list', 'group:add', 'group:edit',
-    'inspection', 'inspection:list', 'inspection:add', 'inspection:edit',
-    'redflag', 'redflag:list', 'grade', 'grade:list',
+    'group', 'group:list', 'group:add', 'group:edit', 'group:delete',
+    'inspection', 'inspection:list', 'inspection:add', 'inspection:edit', 'inspection:delete',
+    'redflag', 'redflag:list', 'redflag:add', 'redflag:edit',
+    'grade', 'grade:list', 'grade:add', 'grade:edit',
   ],
   ROLE_STUDENT: [
     'dashboard', 'dashboard:screen', 'ai', 'ai:chat', 'message', 'message:list', 'student:list', 'score:list',

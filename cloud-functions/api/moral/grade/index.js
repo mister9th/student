@@ -1,23 +1,18 @@
-/** GET /api/moral/grade —— 年段工作列表（P3，占位数据结构） */
-import { S, ok, fail, json } from '../../../_lib/store.js'
-import { ensureSeeded } from '../../../_lib/seed.js'
-import { requirePermission } from '../../../_lib/util.js'
+/** /api/moral/grade?type=goals|summaries|plans —— 兼容入口：转发到规范端点（缺省 goals） */
+import { fail, json } from '../../../_lib/store.js'
+import { onRequest as goalsHandler } from './goals/index.js'
+import { onRequest as summariesHandler } from './summaries/index.js'
+import { onRequest as plansHandler } from './plans/index.js'
+
+const HANDLERS = {
+  goals: goalsHandler,
+  summaries: summariesHandler,
+  plans: plansHandler,
+}
 
 export async function onRequest(context) {
-  try {
-    await ensureSeeded()
-    const user = await requirePermission(context, 'grade:list')
-    if (user instanceof Response) return user
-    const store = S.moral()
-    const q = context.request.query || {}
-    const type = String(q.type || '')
-    const { blobs } = await store.list({ prefix: 'grade/' })
-    let items = await Promise.all(blobs.map((b) => store.get(b.key, { type: 'json' })))
-    items = items.filter((x) => x && x.deleted !== 1 && (!type || x.type === type)).sort((a, b) => (b.id || 0) - (a.id || 0))
-    const page = Math.max(1, Number(q.page) || 1)
-    const pageSize = Math.min(500, Math.max(1, Number(q.pageSize) || 10))
-    return json(ok({ total: items.length, records: items.slice((page - 1) * pageSize, page * pageSize), page, pageSize, totalPages: Math.ceil(items.length / pageSize) }))
-  } catch (e) {
-    return json(fail(e?.message || '年段工作查询失败', 500))
-  }
+  const type = String(context.request.query?.type || 'goals')
+  const fn = HANDLERS[type]
+  if (!fn) return json(fail(`未知的年段工作类型: ${type}（可选 goals/summaries/plans）`, 400))
+  return fn(context)
 }
