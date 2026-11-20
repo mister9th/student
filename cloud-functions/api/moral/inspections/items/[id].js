@@ -1,7 +1,7 @@
 /** PUT/DELETE /api/moral/inspections/items/{id} —— 检查项目修改/删除（删除不级联删记录，记录冗余 itemName） */
-import { S, ok, fail, json, bodyOf, now } from '../../../_lib/store.js'
-import { ensureSeeded } from '../../../_lib/seed.js'
-import { requirePermission, num } from '../../../_lib/util.js'
+import { S, ok, fail, json, bodyOf, now } from '../../../../_lib/store.js'
+import { ensureSeeded } from '../../../../_lib/seed.js'
+import { requirePermission, num } from '../../../../_lib/util.js'
 
 export async function onRequest(context) {
   try {

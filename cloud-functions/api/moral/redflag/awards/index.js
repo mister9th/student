@@ -1,7 +1,7 @@
 /** GET /api/moral/redflag/awards?periodWeek=&periodYear= —— 颁奖历史（按 awardDate 倒序） */
-import { S, ok, fail, json } from '../../../_lib/store.js'
-import { ensureSeeded } from '../../../_lib/seed.js'
-import { requirePermission, num } from '../../../_lib/util.js'
+import { S, ok, fail, json } from '../../../../_lib/store.js'
+import { ensureSeeded } from '../../../../_lib/seed.js'
+import { requirePermission, num } from '../../../../_lib/util.js'
 
 export async function onRequest(context) {
   try {

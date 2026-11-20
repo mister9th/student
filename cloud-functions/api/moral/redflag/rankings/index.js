@@ -1,7 +1,7 @@
 /** GET /api/moral/redflag/rankings?periodWeek=&periodYear=&periodType= —— 红旗榜单（summary 附 className） */
-import { S, ok, fail, json } from '../../../_lib/store.js'
-import { ensureSeeded } from '../../../_lib/seed.js'
-import { requirePermission, num } from '../../../_lib/util.js'
+import { S, ok, fail, json } from '../../../../_lib/store.js'
+import { ensureSeeded } from '../../../../_lib/seed.js'
+import { requirePermission, num } from '../../../../_lib/util.js'
 import { periodOf } from '../_calc.js'
 
 export async function onRequest(context) {

@@ -1,7 +1,7 @@
 /** PUT/DELETE /api/moral/redflag/rules/{id} —— 细则修改/删除 */
-import { S, ok, fail, json, bodyOf, now } from '../../../_lib/store.js'
-import { ensureSeeded } from '../../../_lib/seed.js'
-import { requirePermission, num } from '../../../_lib/util.js'
+import { S, ok, fail, json, bodyOf, now } from '../../../../_lib/store.js'
+import { ensureSeeded } from '../../../../_lib/seed.js'
+import { requirePermission, num } from '../../../../_lib/util.js'
 
 export async function onRequest(context) {
   try {

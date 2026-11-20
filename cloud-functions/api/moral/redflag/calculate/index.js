@@ -2,9 +2,9 @@
  * weekly（传 periodWeek，或全缺省）：完整 5 步（周汇总排名 → 颁奖 → 幂等加分 → 月汇总）。
  * monthly（仅传 periodMonth 不传 periodWeek）：仅重算该年月 monthly 汇总与排名，不颁奖不加分。
  */
-import { S, ok, fail, json, bodyOf } from '../../../_lib/store.js'
-import { ensureSeeded } from '../../../_lib/seed.js'
-import { requirePermission, num } from '../../../_lib/util.js'
+import { S, ok, fail, json, bodyOf } from '../../../../_lib/store.js'
+import { ensureSeeded } from '../../../../_lib/seed.js'
+import { requirePermission, num } from '../../../../_lib/util.js'
 import { periodOf, calculatePeriod, recalcMonth } from '../_calc.js'
 
 const monthValid = (m) => m > 0 && m <= 12

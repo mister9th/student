@@ -1,7 +1,7 @@
 /** GET/POST /api/moral/inspections/items —— 检查项目配置列表与新增 */
-import { S, ok, fail, json, bodyOf, nextId, now } from '../../../_lib/store.js'
-import { ensureSeeded } from '../../../_lib/seed.js'
-import { requirePermission, num } from '../../../_lib/util.js'
+import { S, ok, fail, json, bodyOf, nextId, now } from '../../../../_lib/store.js'
+import { ensureSeeded } from '../../../../_lib/seed.js'
+import { requirePermission, num } from '../../../../_lib/util.js'
 
 export async function onRequest(context) {
   try {

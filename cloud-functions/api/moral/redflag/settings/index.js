@@ -1,7 +1,7 @@
 /** GET/POST /api/moral/redflag/settings —— 参数设置（GET 带缺省值返回；POST 批量 upsert） */
-import { S, ok, fail, json, bodyOf, nextId, now } from '../../../_lib/store.js'
-import { ensureSeeded } from '../../../_lib/seed.js'
-import { requirePermission } from '../../../_lib/util.js'
+import { S, ok, fail, json, bodyOf, nextId, now } from '../../../../_lib/store.js'
+import { ensureSeeded } from '../../../../_lib/seed.js'
+import { requirePermission } from '../../../../_lib/util.js'
 import { settingsOf } from '../_calc.js'
 
 const DEFAULTS = {

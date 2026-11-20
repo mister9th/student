@@ -1,7 +1,7 @@
 /** GET/POST /api/moral/redflag/scores —— 评分录入（GET 分页过滤；POST 录入后自动重算该周汇总排名） */
-import { S, ok, fail, json, bodyOf, nextId, now } from '../../../_lib/store.js'
-import { ensureSeeded } from '../../../_lib/seed.js'
-import { requirePermission, num, pagedOrdered } from '../../../_lib/util.js'
+import { S, ok, fail, json, bodyOf, nextId, now } from '../../../../_lib/store.js'
+import { ensureSeeded } from '../../../../_lib/seed.js'
+import { requirePermission, num, pagedOrdered } from '../../../../_lib/util.js'
 import { periodOf, recalcWeek } from '../_calc.js'
 
 export async function onRequest(context) {

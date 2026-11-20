@@ -1,7 +1,7 @@
 /** GET/POST /api/moral/redflag/dimensions —— 评分维度（GET 附各自 rules；POST 新增） */
-import { S, ok, fail, json, bodyOf, nextId, now } from '../../../_lib/store.js'
-import { ensureSeeded } from '../../../_lib/seed.js'
-import { requirePermission, num } from '../../../_lib/util.js'
+import { S, ok, fail, json, bodyOf, nextId, now } from '../../../../_lib/store.js'
+import { ensureSeeded } from '../../../../_lib/seed.js'
+import { requirePermission, num } from '../../../../_lib/util.js'
 
 export async function onRequest(context) {
   try {

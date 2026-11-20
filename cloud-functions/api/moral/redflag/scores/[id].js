@@ -1,7 +1,7 @@
 /** DELETE /api/moral/redflag/scores/{id} —— 删除评分记录并自动重算该周汇总排名 */
-import { S, ok, fail, json, now } from '../../../_lib/store.js'
-import { ensureSeeded } from '../../../_lib/seed.js'
-import { requirePermission, num } from '../../../_lib/util.js'
+import { S, ok, fail, json, now } from '../../../../_lib/store.js'
+import { ensureSeeded } from '../../../../_lib/seed.js'
+import { requirePermission, num } from '../../../../_lib/util.js'
 import { recalcWeek } from '../_calc.js'
 
 export async function onRequest(context) {
