@@ -66,8 +66,12 @@ export const permsOf = (userType) => ROLE_PERMISSIONS[roleOf(userType)]
 
 /** 从 Bearer header 解析当前用户；无效返回 null */
 export async function currentUser(context) {
-  const headers = context.request.headers || {}
-  const authHeader = headers['authorization'] || headers.Authorization || ''
+  const h = context.request?.headers || {}
+  // EdgeOne 云函数的 request.headers 是标准 Headers 对象（需 .get()）；
+  // 同时兼容普通对象（本地 mock / 部分运行时）。
+  const authHeader = (typeof h.get === 'function'
+    ? (h.get('authorization') || h.get('Authorization') || '')
+    : (h['authorization'] || h['Authorization'] || ''))
   const claims = await verifyToken(authHeader, jwtSecret(context.env))
   if (!claims) return null
   const uid = claims.id ?? claims.userId

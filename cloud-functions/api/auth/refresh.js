@@ -7,8 +7,10 @@ import { currentUser } from '../../_lib/util.js'
 export async function onRequest(context) {
   try {
     await ensureSeeded()
-    const headers = context.request.headers || {}
-    const authHeader = headers['authorization'] || headers.Authorization || ''
+    const h = context.request?.headers || {}
+    const authHeader = (typeof h.get === 'function'
+      ? (h.get('authorization') || h.get('Authorization') || '')
+      : (h['authorization'] || h['Authorization'] || ''))
     const claims = await verifyToken(authHeader, jwtSecret(context.env))
     if (!claims) return json(fail('未登录或登录已过期', 401))
     const user = await currentUser(context)
