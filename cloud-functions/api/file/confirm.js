@@ -7,11 +7,13 @@
  */
 import { S, ok, fail, json, bodyOf, nextId, now } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
-import { currentUser, enc, extOf, contentTypeOf, num } from '../../_lib/util.js'
+import { enc, extOf, contentTypeOf, num, requirePermission } from '../../_lib/util.js'
 
 export async function onRequest(context) {
   try {
     await ensureSeeded()
+    const guard = await requirePermission(context, 'file')
+    if (guard instanceof Response) return guard
     const body = await bodyOf(context.request)
     const key = String(body.key || body.fileKey || '').replace(/^\/+/, '')
     if (!key) return json(fail('缺少文件 key', 400), 400)
@@ -22,7 +24,6 @@ export async function onRequest(context) {
     const businessType = String(body.businessType || body.business_type || 'other')
     const fileUrl = `/api/file/public/${enc(key)}`
     const store = S.content()
-    const user = await currentUser(context)
 
     // 查找 get-upload-url 阶段可能已建的元数据（兼容旧实现），实现幂等确认
     let existing = null
@@ -40,7 +41,7 @@ export async function onRequest(context) {
       fileSize: num(body.fileSize, 0),
       fileType: ext,
       mimeType: mime,
-      uploadBy: user?.realName || '系统管理员',
+      uploadBy: guard.realName || '系统管理员',
       businessType,
       url: fileUrl,
       fileUrl,

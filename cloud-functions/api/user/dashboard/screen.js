@@ -1,7 +1,7 @@
 /** GET /api/user/dashboard/screen —— 数据大屏聚合（内存计算替代 SQL GROUP BY） */
 import { S, ok, fail, json } from '../../../_lib/store.js'
 import { ensureSeeded } from '../../../_lib/seed.js'
-import { num } from '../../../_lib/util.js'
+import { num, requirePermission } from '../../../_lib/util.js'
 
 const FALLBACK_AVG = [76, 78, 77, 81, 83, 85]
 
@@ -24,6 +24,8 @@ const categoryOf = (name) => {
 export async function onRequest(context) {
   try {
     await ensureSeeded()
+    const guard = await requirePermission(context, 'dashboard')
+    if (guard instanceof Response) return guard
     const academic = S.academic()
     const [students, teachers, courses, scores] = await Promise.all([
       allOf(academic, 'students/'), allOf(academic, 'teachers/'),

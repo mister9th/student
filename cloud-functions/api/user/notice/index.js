@@ -1,11 +1,13 @@
 /** POST /api/user/notice —— 新增公告 */
 import { S, ok, fail, json, bodyOf, nextId, now } from '../../../_lib/store.js'
 import { ensureSeeded } from '../../../_lib/seed.js'
-import { num } from '../../../_lib/util.js'
+import { num, requirePermission } from '../../../_lib/util.js'
 
 export async function onRequest(context) {
   try {
     await ensureSeeded()
+    const guard = await requirePermission(context, 'notice')
+    if (guard instanceof Response) return guard
     const body = await bodyOf(context.request)
     const store = S.content()
     const id = await nextId(store, 'notices/')

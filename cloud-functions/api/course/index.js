@@ -1,11 +1,13 @@
 /** POST /api/course —— 新增课程（K12：去 courseCode/credit/selectedCount，status 0未开始/1进行中/2已结课） */
 import { S, ok, fail, json, bodyOf, nextId, now } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
-import { val, num } from '../../_lib/util.js'
+import { val, num, requirePermission } from '../../_lib/util.js'
 
 export async function onRequest(context) {
   try {
     await ensureSeeded()
+    const guard = await requirePermission(context, 'course:add')
+    if (guard instanceof Response) return guard
     const body = await bodyOf(context.request)
     const courseName = String(body.courseName || '').trim()
     const stage = num(body.stage, 0)

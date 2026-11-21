@@ -1,5 +1,5 @@
 /** 五育综评公共逻辑（P1 §3） */
-import { now } from '../../../_lib/store.js'
+import { S, now } from '../../../_lib/store.js'
 import { num } from '../../../_lib/util.js'
 
 export const DIMENSIONS = ['de', 'zhi', 'ti', 'mei', 'lao']
@@ -28,6 +28,38 @@ export async function applyFiveEduDelta(store, studentId, dimension, delta) {
   const fe = doc.fiveEdu && typeof doc.fiveEdu === 'object' ? { ...doc.fiveEdu } : {}
   for (const d of DIMENSIONS) fe[d] = Math.max(0, num(fe[d], 0))
   fe[dimension] = Math.max(0, num(fe[dimension], 0) + num(delta, 0))
+  await store.setJSON(key, { ...doc, fiveEdu: fe, updateTime: now() })
+  return fe
+}
+
+/**
+ * 全量重算学生 fiveEdu 汇总（替代差值回滚）。
+ * 读取 edu-moral store 下该生全部未删除打标记录，按维度累加 scoreOf(level) 后写回学生文档。
+ * 避免触底 clamp(0) 导致差值回滚凭空加分，以及多次编辑产生的累积误差。
+ * @param store S.academic() 实例（学生文档所在 store）
+ * @param studentId 学生档案 id
+ */
+export async function rebuildFiveEdu(store, studentId) {
+  if (!studentId) return null
+  const key = `students/${studentId}.json`
+  const doc = await store.get(key, { type: 'json' })
+  if (!doc || doc.deleted === 1) return null
+
+  const moral = S.moral()
+  const { blobs } = await moral.list({ prefix: 'fiveedu/' })
+  const records = await Promise.all(blobs.map((b) => moral.get(b.key, { type: 'json' })))
+
+  const fe = {}
+  for (const d of DIMENSIONS) fe[d] = 0
+  for (const r of records) {
+    if (!r || r.deleted === 1) continue
+    if (num(r.studentId, 0) !== num(studentId, 0)) continue
+    const dim = String(r.dimension || '')
+    if (!DIMENSIONS.includes(dim)) continue
+    fe[dim] += scoreOf(r.level)
+  }
+  for (const d of DIMENSIONS) fe[d] = Math.max(0, fe[d])
+
   await store.setJSON(key, { ...doc, fiveEdu: fe, updateTime: now() })
   return fe
 }

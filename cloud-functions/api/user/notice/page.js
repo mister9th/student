@@ -1,11 +1,13 @@
 /** GET /api/user/notice/page */
 import { S, ok, fail, json, paged } from '../../../_lib/store.js'
 import { ensureSeeded } from '../../../_lib/seed.js'
-import { stripRecords } from '../../../_lib/util.js'
+import { stripRecords, requirePermission } from '../../../_lib/util.js'
 
 export async function onRequest(context) {
   try {
     await ensureSeeded()
+    const guard = await requirePermission(context, 'notice')
+    if (guard instanceof Response) return guard
     const q = context.request.query || {}
     const title = q.title ? String(q.title).trim() : ''
     const filter = (x) => !title || String(x.title || '').includes(title)

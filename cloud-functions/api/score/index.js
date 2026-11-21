@@ -1,7 +1,7 @@
 /** POST /api/score —— 录入成绩（K12 单考次模型；P1 可选 examId 覆盖冗余字段） */
 import { S, ok, fail, json, bodyOf, nextId, now } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
-import { num, k12GradeOf, currentSemester } from '../../_lib/util.js'
+import { num, k12GradeOf, currentSemester, requirePermission } from '../../_lib/util.js'
 
 const pad2 = (n) => String(n).padStart(2, '0')
 const today = () => {
@@ -12,6 +12,8 @@ const today = () => {
 export async function onRequest(context) {
   try {
     await ensureSeeded()
+    const guard = await requirePermission(context, 'score:add')
+    if (guard instanceof Response) return guard
     const body = await bodyOf(context.request)
     const store = S.academic()
     const studentId = num(body.studentId, 0)

@@ -8,10 +8,11 @@
  *   courseCount, attendanceRate, analysis, strengths, weaknesses, suggestion }
  */
 import { ensureSeeded } from '../../_lib/seed.js'
+import { requirePermission } from '../../_lib/util.js'
 import { S, ok, fail, json, bodyOf } from '../../_lib/store.js'
 import {
   askAI, pick, num, getDoc, scoresOf, classMap, studentName,
-  className, scoreValue, deriveAttendance,
+  className, scoreValue, deriveAttendance, ownStudentIdOf,
 } from './_shared.js'
 
 function ruleText(name, avg, courseCount) {
@@ -32,11 +33,18 @@ export async function onRequest(context) {
   try {
     await ensureSeeded()
 
-    const body = await bodyOf(context.request)
-    const studentId = num(pick(body, 'studentId', 'student_id'), 0)
-    if (!studentId) return json(fail('缺少 studentId', 400), 400)
+    const guard = await requirePermission(context, 'ai')
+    if (guard instanceof Response) return guard
 
+    const body = await bodyOf(context.request)
     const academic = S.academic()
+    let studentId = num(pick(body, 'studentId', 'student_id'), 0)
+    // 学生角色只能读取本人的分析结果，忽略前端传入的 studentId
+    if (Number(guard.userType) === 1) {
+      studentId = await ownStudentIdOf(guard, academic)
+      if (!studentId) return json(fail('未定位到学生档案', 403), 403)
+    }
+    if (!studentId) return json(fail('缺少 studentId', 400), 400)
     const studentDoc = await getDoc(academic, `students/${studentId}.json`)
     const scores = await scoresOf(studentId)
     const valid = scores.map(scoreValue).filter((v) => v > 0)

@@ -140,6 +140,20 @@ export const classMap = () => docMap(S.academic(), 'classes/', ['id', 'classId',
 export const studentMap = () => docMap(S.academic(), 'students/', ['id', 'studentId', 'student_id'])
 
 /**
+ * 学生用户 -> 本人学生档案 id（student.userId === user.id），找不到返回 0；非学生返回 0。
+ * 与 homework/_shared.js 的 ownStudentProfile 同思路，供 ai 端点做学生数据隔离。
+ */
+export async function ownStudentIdOf(user, academic) {
+  if (!user || Number(user.userType) !== 1) return 0
+  const uid = num(user.id ?? user.userId, 0)
+  if (!uid) return 0
+  const { blobs } = await academic.list({ prefix: 'students/' })
+  const docs = await Promise.all(blobs.map((b) => academic.get(b.key, { type: 'json' })))
+  const found = docs.find((d) => d && d.deleted !== 1 && num(pick(d, 'userId', 'user_id'), 0) === uid)
+  return found ? num(pick(found, 'id', 'studentId', 'student_id'), 0) : 0
+}
+
+/**
  * 解析学生姓名：学生文档 → 成绩冗余字段 → edu-auth/users/<userId>
  */
 export async function studentName(studentId, studentDoc = null, scoreDoc = null) {

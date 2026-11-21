@@ -1,10 +1,13 @@
 /** PUT /api/message/read-all —— 全部标记已读 */
 import { S, ok, fail, json, now } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
+import { requirePermission } from '../../_lib/util.js'
 
 export async function onRequest(context) {
   try {
     await ensureSeeded()
+    const guard = await requirePermission(context, 'message')
+    if (guard instanceof Response) return guard
     const store = S.content()
     const { blobs } = await store.list({ prefix: 'messages/' })
     const ts = now()

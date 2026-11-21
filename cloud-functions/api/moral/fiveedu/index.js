@@ -2,7 +2,7 @@
 import { S, ok, fail, json, bodyOf, nextId, now } from '../../../_lib/store.js'
 import { ensureSeeded } from '../../../_lib/seed.js'
 import { requirePermission, num } from '../../../_lib/util.js'
-import { DIMENSIONS, scoreOf, applyFiveEduDelta } from './_fiveedu.js'
+import { DIMENSIONS, scoreOf, applyFiveEduDelta, rebuildFiveEdu } from './_fiveedu.js'
 
 export async function onRequest(context) {
   try {
@@ -38,7 +38,8 @@ export async function onRequest(context) {
       teacherId: guard.id ?? guard.userId ?? null, teacherName: String(guard.realName || ''),
       createTime: ts, updateTime: ts, deleted: 0,
     })
-    const fiveEdu = await applyFiveEduDelta(academic, studentId, dimension, scoreOf(level))
+    // 全量重算汇总（写新记录后重算，保证五育分值始终与未删除记录一致）
+    const fiveEdu = await rebuildFiveEdu(academic, studentId)
     return json(ok({ id, fiveEdu }))
   } catch (e) {
     return json(fail(e?.message || '五育打标失败', 500))

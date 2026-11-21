@@ -1,12 +1,14 @@
 /** POST /api/class —— 新增班级（K12：stage/grade 必填，去 major/department） */
 import { S, ok, fail, json, bodyOf, nextId, now } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
-import { val, num } from '../../_lib/util.js'
+import { val, num, requirePermission } from '../../_lib/util.js'
 import { normalizeWalking } from './_walking.js'
 
 export async function onRequest(context) {
   try {
     await ensureSeeded()
+    const guard = await requirePermission(context, 'class:add')
+    if (guard instanceof Response) return guard
     const body = await bodyOf(context.request)
     const className = String(body.className || '').trim()
     const stage = num(body.stage, 0)

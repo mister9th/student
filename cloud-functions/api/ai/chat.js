@@ -7,6 +7,7 @@
  * - 响应结构对齐 mock.ts：{ sessionId, message }
  */
 import { ensureSeeded } from '../../_lib/seed.js'
+import { requirePermission } from '../../_lib/util.js'
 import { S, ok, fail, json, bodyOf } from '../../_lib/store.js'
 import { askAI, pick, listDocs, appendChatMessage, scoreStats, clamp } from './_shared.js'
 
@@ -44,6 +45,9 @@ export async function onRequest(context) {
 
     const method = String((context.request && context.request.method) || 'POST').toUpperCase()
     if (method !== 'POST') return json(fail('仅支持 POST 请求', 405), 405)
+
+    const guard = await requirePermission(context, 'ai:chat')
+    if (guard instanceof Response) return guard
 
     const body = await bodyOf(context.request)
     const question = String(pick(body, 'message', 'content', 'q') || '').trim()

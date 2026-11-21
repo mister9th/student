@@ -21,13 +21,15 @@ export async function onRequest(context) {
     }
     const subjectId = q.subjectId ? num(q.subjectId, 0) : 0
     const semester = q.semester ? String(q.semester).trim() : ''
+    const title = q.title ? String(q.title).trim() : ''
     const status = q.status !== undefined && q.status !== '' && q.status !== null ? num(q.status, -1) : -1
 
     const filter = (x) =>
       (!classId || num(x.classId, 0) === classId) &&
       (!subjectId || num(x.subjectId, 0) === subjectId) &&
       (!semester || String(x.semester || '') === semester) &&
-      (status === -1 || num(x.status, 1) === status)
+      (status === -1 || num(x.status, 1) === status) &&
+      (!title || String(x.title || '').includes(title))
 
     const result = await pagedOrdered(store, 'assignments/', q, filter, false)
     const records = await Promise.all(result.records.map(async (a) => ({

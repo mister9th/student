@@ -1,7 +1,7 @@
 /** GET/PUT/DELETE /api/score/{id}（PUT 重算 gradeLevel；P1 可选 examId 覆盖冗余字段） */
 import { S, ok, fail, json, bodyOf, now } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
-import { num, k12GradeOf, currentSemester, strip } from '../../_lib/util.js'
+import { num, k12GradeOf, currentSemester, strip, requirePermission } from '../../_lib/util.js'
 
 const pad2 = (n) => String(n).padStart(2, '0')
 const today = () => {
@@ -14,6 +14,8 @@ export async function onRequest(context) {
     await ensureSeeded()
     const id = String(context.params?.id || '').replace(/\D/g, '')
     const method = context.request.method
+    const guard = await requirePermission(context, method === 'GET' ? 'score:list' : 'score:edit')
+    if (guard instanceof Response) return guard
     const store = S.academic()
     const key = `scores/${id}.json`
     const doc = await store.get(key, { type: 'json' })

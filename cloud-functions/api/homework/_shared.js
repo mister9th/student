@@ -43,13 +43,19 @@ export function normalizeAssignment(body = {}, base = null) {
   }
 }
 
-/** 迟交判定：submitTime 晚于 dueTime 置 1 */
+/**
+ * 迟交判定：submitTime 晚于 dueTime 置 1。
+ * now() 产出 UTC 墙钟，dueTime 是本地（北京时间）墙钟；演示系统固定中国时区（UTC+8），
+ * 因此比较前把 submitTime 换算为北京时间（+8h）再与 dueTime 比对。
+ */
 export function isLateOf(dueTime, submitTime) {
   if (!dueTime || !submitTime) return 0
   const due = new Date(String(dueTime).replace(' ', 'T'))
   const sub = new Date(String(submitTime).replace(' ', 'T'))
   if (Number.isNaN(due.getTime()) || Number.isNaN(sub.getTime())) return 0
-  return sub.getTime() > due.getTime() ? 1 : 0
+  // now() 为 UTC、dueTime 为北京时间：submitTime +8h 后再比较
+  const subBeijing = new Date(sub.getTime() + 8 * 3600 * 1000)
+  return subBeijing.getTime() > due.getTime() ? 1 : 0
 }
 
 /** 学生用户 -> 学生档案（找不到返回 null）；非学生返回 null */

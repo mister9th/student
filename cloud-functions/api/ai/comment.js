@@ -8,11 +8,12 @@
  * - 导出 buildComment 供 /api/ai/term-comment 复用同款 prompt（P1 §6）
  */
 import { ensureSeeded } from '../../_lib/seed.js'
+import { requirePermission } from '../../_lib/util.js'
 import { S, ok, fail, json, bodyOf, now } from '../../_lib/store.js'
 import { STAGES, GRADE_NAMES, gradeLabel, k12GradeOf, currentSemester } from '../../_lib/k12.js'
 import {
   askAI, pick, num, getDoc, scoresOf, courseMap, studentName,
-  courseName, scoreValue,
+  courseName, scoreValue, ownStudentIdOf,
 } from './_shared.js'
 
 const SYSTEM_PROMPTS = {
@@ -92,8 +93,14 @@ export async function buildComment(context, studentId, commentType = 'semester',
 export async function onRequest(context) {
   try {
     await ensureSeeded()
+    const guard = await requirePermission(context, 'ai')
+    if (guard instanceof Response) return guard
     const body = await bodyOf(context.request)
-    const studentId = num(pick(body, 'studentId', 'student_id'), 0)
+    let studentId = num(pick(body, 'studentId', 'student_id'), 0)
+    if (Number(guard.userType) === 1) {
+      studentId = await ownStudentIdOf(guard, S.academic())
+      if (!studentId) return json(fail('未定位到学生档案', 403), 403)
+    }
     const commentType = String(pick(body, 'commentType', 'comment_type') || 'semester')
     const term = String(pick(body, 'term', 'semester') || '')
     if (!studentId) return json(fail('缺少 studentId', 400), 400)

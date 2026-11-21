@@ -1,7 +1,7 @@
 /** GET/PUT/DELETE /api/class/{id}（K12：stage/grade 为 1-12 整数，去 major/department） */
 import { S, ok, fail, json, bodyOf, now } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
-import { val, num, strip } from '../../_lib/util.js'
+import { val, num, strip, requirePermission } from '../../_lib/util.js'
 import { normalizeWalking } from './_walking.js'
 
 const validStage = (v) => [1, 2, 3].includes(num(v, 0))
@@ -12,6 +12,8 @@ export async function onRequest(context) {
     await ensureSeeded()
     const id = String(context.params?.id || '').replace(/\D/g, '')
     const method = context.request.method
+    const guard = await requirePermission(context, method === 'GET' ? 'class:list' : 'class:edit')
+    if (guard instanceof Response) return guard
     const store = S.academic()
     const key = `classes/${id}.json`
     const doc = await store.get(key, { type: 'json' })

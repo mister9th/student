@@ -8,10 +8,11 @@
  *   riskLevel,description,suggestion}] }
  */
 import { ensureSeeded } from '../../_lib/seed.js'
+import { requirePermission } from '../../_lib/util.js'
 import { S, ok, fail, json, bodyOf } from '../../_lib/store.js'
 import {
   askAI, pick, num, allScores, courseMap, classMap, studentMap,
-  studentName, className, courseName, scoreValue,
+  studentName, className, courseName, scoreValue, getDoc, ownStudentIdOf,
 } from './_shared.js'
 
 const RULE_SUGGESTION = '建议辅导员及时与学生沟通，了解原因并提供学习帮扶。'
@@ -20,9 +21,21 @@ export async function onRequest(context) {
   try {
     await ensureSeeded()
 
+    const guard = await requirePermission(context, 'ai')
+    if (guard instanceof Response) return guard
+
     const body = await bodyOf(context.request)
     const filterStudentId = num(pick(body, 'studentId', 'student_id'), 0)
-    const filterClassId = num(pick(body, 'classId', 'class_id'), 0)
+    let filterClassId = num(pick(body, 'classId', 'class_id'), 0)
+    // 学生角色强制只看本人班级的预警，忽略前端传入的 classId
+    if (Number(guard.userType) === 1) {
+      const academic = S.academic()
+      const sid = await ownStudentIdOf(guard, academic)
+      const stuDoc = sid ? await getDoc(academic, `students/${sid}.json`) : null
+      const ownClassId = num(pick(stuDoc, 'classId', 'class_id'), 0)
+      if (!ownClassId) return json(fail('未定位到学生班级', 403), 403)
+      filterClassId = ownClassId
+    }
 
     const [scores, courses, classes, students] = await Promise.all([
       allScores(), courseMap(), classMap(), studentMap(),

@@ -2,13 +2,15 @@
 import bcrypt from 'bcryptjs'
 import { S, ok, fail, json, bodyOf, ensureUnique, now } from '../../../_lib/store.js'
 import { ensureSeeded } from '../../../_lib/seed.js'
-import { enc, val, num, strip } from '../../../_lib/util.js'
+import { enc, val, num, strip, requirePermission } from '../../../_lib/util.js'
 
 export async function onRequest(context) {
   try {
     await ensureSeeded()
     const id = String(context.params?.id || '').replace(/\D/g, '')
     const method = context.request.method
+    const guard = await requirePermission(context, method === 'GET' ? 'student:list' : 'student:edit')
+    if (guard instanceof Response) return guard
     const auth = S.auth()
     const academic = S.academic()
     const key = `students/${id}.json`

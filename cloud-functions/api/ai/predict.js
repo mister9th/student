@@ -9,22 +9,29 @@
  *   historyAvg, attendanceRate }
  */
 import { ensureSeeded } from '../../_lib/seed.js'
+import { requirePermission } from '../../_lib/util.js'
 import { S, ok, fail, json, bodyOf } from '../../_lib/store.js'
 import {
   askAI, pick, num, clamp, getDoc, scoresOf, courseMap, studentName,
-  courseName, scoreValue, deriveAttendance, extractScore, extractRiskLevel,
+  courseName, scoreValue, deriveAttendance, extractScore, extractRiskLevel, ownStudentIdOf,
 } from './_shared.js'
 
 export async function onRequest(context) {
   try {
     await ensureSeeded()
 
-    const body = await bodyOf(context.request)
-    const studentId = num(pick(body, 'studentId', 'student_id'), 0)
-    const courseId = num(pick(body, 'courseId', 'course_id'), 0)
-    if (!studentId || !courseId) return json(fail('缺少 studentId 或 courseId', 400), 400)
+    const guard = await requirePermission(context, 'ai')
+    if (guard instanceof Response) return guard
 
+    const body = await bodyOf(context.request)
     const academic = S.academic()
+    let studentId = num(pick(body, 'studentId', 'student_id'), 0)
+    const courseId = num(pick(body, 'courseId', 'course_id'), 0)
+    if (Number(guard.userType) === 1) {
+      studentId = await ownStudentIdOf(guard, academic)
+      if (!studentId) return json(fail('未定位到学生档案', 403), 403)
+    }
+    if (!studentId || !courseId) return json(fail('缺少 studentId 或 courseId', 400), 400)
     const studentDoc = await getDoc(academic, `students/${studentId}.json`)
     const courses = await courseMap()
     const courseDoc = courses.get(courseId) || (await getDoc(academic, `courses/${courseId}.json`))

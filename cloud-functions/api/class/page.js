@@ -1,7 +1,7 @@
 /** GET /api/class/page（K12：className 模糊 + stage/grade 过滤；P1 §4.2 年级组长按 manageGrades 强制过滤） */
 import { S, ok, fail, json } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
-import { pagedOrdered, stripRecords, num, currentUser } from '../../_lib/util.js'
+import { pagedOrdered, stripRecords, num, currentUser, requirePermission } from '../../_lib/util.js'
 
 export async function onRequest(context) {
   try {
@@ -20,6 +20,8 @@ export async function onRequest(context) {
       (isWalking === -1 || num(x.isWalking, 0) === isWalking) &&
       (!subjectCombo || String(x.subjectCombo || '') === subjectCombo)
     const user = await currentUser(context)
+    const guard = await requirePermission(context, 'class:list')
+    if (guard instanceof Response) return guard
     if (user && Number(user.userType) === 4) {
       const grades = Array.isArray(user.manageGrades) ? user.manageGrades.map(Number).filter(Number.isFinite) : []
       const gs = new Set(grades)

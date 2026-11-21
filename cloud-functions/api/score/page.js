@@ -1,7 +1,7 @@
 /** GET /api/score/page（单考次模型过滤；P1 §4.2 年级组长按 manageGrades 经班级 grade 强制过滤） */
 import { S, ok, fail, json } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
-import { pagedOrdered, stripRecords, num, currentUser } from '../../_lib/util.js'
+import { pagedOrdered, stripRecords, num, currentUser, requirePermission } from '../../_lib/util.js'
 
 export async function onRequest(context) {
   try {
@@ -22,6 +22,8 @@ export async function onRequest(context) {
       (!examName || String(x.examName || '').includes(examName))
 
     const user = await currentUser(context)
+    const guard = await requirePermission(context, 'score:list')
+    if (guard instanceof Response) return guard
     if (user && Number(user.userType) === 4) {
       const grades = Array.isArray(user.manageGrades) ? user.manageGrades.map(Number).filter(Number.isFinite) : []
       const gs = new Set(grades)

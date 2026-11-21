@@ -5,6 +5,7 @@
  * （mockAdapter 统一用 ok() 包装，真实后端同样返回 json(ok(数组))）
  */
 import { ensureSeeded } from '../../../_lib/seed.js'
+import { requirePermission } from '../../../_lib/util.js'
 import { S, ok, fail, json } from '../../../_lib/store.js'
 import { listDocs, pick } from '../_shared.js'
 
@@ -14,6 +15,10 @@ export async function onRequest(context) {
 
     const method = String((context.request && context.request.method) || 'GET').toUpperCase()
     if (method !== 'GET') return json(fail('仅支持 GET 请求', 405), 405)
+
+    // 仅要求登录并具备 ai:chat；sessionId 归属强校验暂不实施（见验收报告 A5 残留风险）
+    const guard = await requirePermission(context, 'ai:chat')
+    if (guard instanceof Response) return guard
 
     // 动态路由参数：优先取 context.params，再尝试从 URL 路径/query 解析
     let sessionId = String(

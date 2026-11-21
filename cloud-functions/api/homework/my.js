@@ -40,7 +40,13 @@ export async function onRequest(context) {
       return {
         ...a,
         submission: sub
-          ? { id: sub.id, status: sub.status, score: sub.score, gradeLevel: sub.gradeLevel, isLate: sub.isLate, submitTime: sub.submitTime }
+          ? {
+            id: sub.id, status: sub.status, score: sub.score, gradeLevel: sub.gradeLevel,
+            isLate: sub.isLate, submitTime: sub.submitTime,
+            // 学生读本人提交内容，供前端「重交」回填（无隐私问题）
+            content: String(sub.content || ''),
+            attachments: Array.isArray(sub.attachments) ? sub.attachments : [],
+          }
           : null,
         submitStatus: sub ? (sub.status === 'graded' ? '已批改' : '已交') : '未交',
       }

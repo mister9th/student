@@ -8,6 +8,11 @@ export async function onRequest(context) {
   try {
     await ensureSeeded()
     const body = await bodyOf(context.request)
+    // A1：注册开关（仅显式 false 关闭，默认开放）；优先读 config/settings.json，兼容 settings.json
+    const cfgStore = S.config()
+    const settings = await cfgStore.get('config/settings.json', { type: 'json' })
+      || await cfgStore.get('settings.json', { type: 'json' })
+    if (settings && settings.enableRegistration === false) return json(fail('注册未开放', 403), 403)
     const username = String(body.username || '').trim()
     if (!username) return json(fail('用户名不能为空', 400))
     const auth = S.auth()
@@ -17,7 +22,8 @@ export async function onRequest(context) {
       return json(fail('用户名已存在', 400))
     }
     const uid = await nextId(auth, 'users/')
-    const userType = [1, 2, 3].includes(Number(body.userType)) ? Number(body.userType) : 1
+    // A1：自助注册仅允许学生（ROLE_STUDENT），禁止注册管理员/教师
+    const userType = 1
     const ts = now()
     const user = {
       id: uid,

@@ -1,7 +1,7 @@
 /** GET/PUT/DELETE /api/course/{id}（K12：去 courseCode/credit，status 0未开始/1进行中/2已结课） */
 import { S, ok, fail, json, bodyOf, now } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
-import { val, num, strip } from '../../_lib/util.js'
+import { val, num, strip, requirePermission } from '../../_lib/util.js'
 
 const validStage = (v) => [1, 2, 3].includes(num(v, 0))
 
@@ -10,6 +10,8 @@ export async function onRequest(context) {
     await ensureSeeded()
     const id = String(context.params?.id || '').replace(/\D/g, '')
     const method = context.request.method
+    const guard = await requirePermission(context, method === 'GET' ? 'course:list' : 'course:edit')
+    if (guard instanceof Response) return guard
     const store = S.academic()
     const key = `courses/${id}.json`
     const doc = await store.get(key, { type: 'json' })

@@ -1,13 +1,15 @@
 /** GET /api/file/page —— 文件元数据分页（每条保证 url/fileUrl 非空） */
 import { S, ok, fail, json, paged } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
-import { enc, stripRecords } from '../../_lib/util.js'
+import { enc, stripRecords, requirePermission } from '../../_lib/util.js'
 
 const publicUrlOf = (key) => `/api/file/public/${enc(key || '')}`
 
 export async function onRequest(context) {
   try {
     await ensureSeeded()
+    const guard = await requirePermission(context, 'file:list')
+    if (guard instanceof Response) return guard
     const q = context.request.query || {}
     const name = q.fileName ? String(q.fileName).trim() : ''
     const filter = (x) => !name || String(x.fileName || '').includes(name)

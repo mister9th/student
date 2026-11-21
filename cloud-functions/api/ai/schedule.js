@@ -8,6 +8,7 @@
  *   suggestedTime, suggestedClassroom, reason}] }
  */
 import { ensureSeeded } from '../../_lib/seed.js'
+import { requirePermission } from '../../_lib/util.js'
 import { S, ok, fail, json, bodyOf } from '../../_lib/store.js'
 import { askAI, pick, listDocs, courseName } from './_shared.js'
 
@@ -16,6 +17,9 @@ const WEEK = ['一', '二', '三', '四', '五']
 export async function onRequest(context) {
   try {
     await ensureSeeded()
+
+    const guard = await requirePermission(context, 'ai')
+    if (guard instanceof Response) return guard
 
     const body = await bodyOf(context.request)
     const grade = String(pick(body, 'grade') || '')

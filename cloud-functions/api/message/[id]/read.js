@@ -1,10 +1,13 @@
 /** PUT /api/message/{id}/read —— 单条标记已读 */
 import { S, ok, fail, json, now } from '../../../_lib/store.js'
 import { ensureSeeded } from '../../../_lib/seed.js'
+import { requirePermission } from '../../../_lib/util.js'
 
 export async function onRequest(context) {
   try {
     await ensureSeeded()
+    const guard = await requirePermission(context, 'message')
+    if (guard instanceof Response) return guard
     const id = String(context.params?.id || '').replace(/\D/g, '')
     const store = S.content()
     const key = `messages/${id}.json`

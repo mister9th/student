@@ -2,7 +2,7 @@
 import { S, ok, fail, json, bodyOf, now } from '../../../_lib/store.js'
 import { ensureSeeded } from '../../../_lib/seed.js'
 import { requirePermission, num } from '../../../_lib/util.js'
-import { DIMENSIONS, scoreOf, applyFiveEduDelta } from './_fiveedu.js'
+import { DIMENSIONS, scoreOf, applyFiveEduDelta, rebuildFiveEdu } from './_fiveedu.js'
 
 const parseTags = (v) => (Array.isArray(v)
   ? v.filter((t) => t !== null && t !== undefined && String(t).trim()).map((t) => String(t).trim())
@@ -23,9 +23,9 @@ export async function onRequest(context) {
     if (!doc || doc.deleted === 1) return json(ok(null))
 
     if (method === 'DELETE') {
-      // 回滚已累加分值（下限 0），再软删记录
-      await applyFiveEduDelta(academic, num(doc.studentId, 0), String(doc.dimension || ''), -scoreOf(doc.level))
+      // 先软删记录，再全量重算该生 fiveEdu（只汇总未删除记录）
       await store.setJSON(key, { ...doc, deleted: 1, updateTime: now() })
+      await rebuildFiveEdu(academic, num(doc.studentId, 0))
       return json(ok(null))
     }
     if (method === 'PUT') {
@@ -38,15 +38,6 @@ export async function onRequest(context) {
       if (![1, 2, 3, 4].includes(newLevel)) return json(fail('等级不合法（1-4）', 400))
       const studentId = num(doc.studentId, 0)
 
-      // 防重复累加：维度与等级均未变化时跳过 fiveEdu 写；换维度时先回滚旧维度再累加新维度
-      if (newLevel !== oldLevel || newDimension !== oldDimension) {
-        if (oldDimension !== newDimension) {
-          await applyFiveEduDelta(academic, studentId, oldDimension, -scoreOf(oldLevel))
-          await applyFiveEduDelta(academic, studentId, newDimension, scoreOf(newLevel))
-        } else {
-          await applyFiveEduDelta(academic, studentId, newDimension, scoreOf(newLevel) - scoreOf(oldLevel))
-        }
-      }
       const student = await academic.get(`students/${studentId}.json`, { type: 'json' })
       await store.setJSON(key, {
         ...doc,
@@ -61,6 +52,8 @@ export async function onRequest(context) {
         grade: student ? num(student.grade, 0) : num(doc.grade, 0),
         updateTime: now(),
       })
+      // 记录更新后全量重算，避免差值回滚在触底时凭空加分
+      await rebuildFiveEdu(academic, studentId)
       return json(ok(null))
     }
     return json(fail('方法不允许', 405))

@@ -31,10 +31,13 @@ export async function onRequest(context) {
       if (c) countByCombo[c] = (countByCombo[c] || 0) + 1
     })
 
-    const list = classes.map((c) => ({
-      ...strip(c),
-      comboCount: num(c.subjectCombo, '') ? (countByCombo[String(c.subjectCombo)] || 0) : 0,
-    }))
+    const list = classes.map((c) => {
+      const combo = String(c.subjectCombo || '')
+      return {
+        ...strip(c),
+        comboCount: combo ? (countByCombo[combo] || 0) : 0,
+      }
+    })
     return json(ok({ list, total: list.length, countByCombo }))
   } catch (e) {
     return json(fail(e?.message || '走班班查询失败', 500))

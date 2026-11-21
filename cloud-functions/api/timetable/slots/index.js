@@ -28,7 +28,8 @@ export async function onRequest(context) {
     for (let i = 0; i < rawSlots.length; i++) {
       const { error, data } = normalizeSlot(rawSlots[i], id)
       if (error) return json(fail(`第 ${i + 1} 个课时：${error}`, 400))
-      candidates.push({ ...data, id: baseId + i })
+      // B3：从 table 文档注入学期，使冲突检测按学期隔离
+      candidates.push({ ...data, id: baseId + i, semester: String(table.semester || '') })
     }
 
     // 写前冲突检测：用候选集替换该表旧 slot 后计算，有冲突则拒绝写入

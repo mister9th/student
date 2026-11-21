@@ -1,6 +1,7 @@
 /** GET /api/user/dashboard/stats —— 计数聚合 */
 import { S, ok, fail, json } from '../../../_lib/store.js'
 import { ensureSeeded } from '../../../_lib/seed.js'
+import { requirePermission } from '../../../_lib/util.js'
 
 async function countActive(store, prefix, extra = null) {
   const { blobs } = await store.list({ prefix })
@@ -11,6 +12,8 @@ async function countActive(store, prefix, extra = null) {
 export async function onRequest(context) {
   try {
     await ensureSeeded()
+    const guard = await requirePermission(context, 'dashboard')
+    if (guard instanceof Response) return guard
     const academic = S.academic()
     const [studentCount, teacherCount, courseCount, classCount, activeUsers] = await Promise.all([
       countActive(academic, 'students/'),

@@ -66,40 +66,44 @@ export function normalizeSlot(raw = {}, tableId = 0, base = null) {
   }
 }
 
-const conflict = (type, a, b, day, period) => ({
+const conflict = (type, a, b) => ({
   type,
   slotA: toNum(a.id, 0),
   slotB: toNum(b.id, 0),
-  day: toNum(day, 0),
-  period: toNum(period, 0),
+  day: toNum(a.day, 0),
+  period: toNum(a.period, 0),
+  // 冲突对象附带学期（前端兼容：多余字段不影响现有展示）
+  semester: String(a.semester ?? b.semester ?? ''),
   tableIdA: toNum(a.tableId, 0),
   tableIdB: toNum(b.tableId, 0),
 })
 
 /**
  * 三类冲突检测（纯函数）：
- *  1. 教师冲突：同 day+period 下 teacherId 重复（跨所有 table）
- *  2. 教室冲突：同 day+period 下 classroom 重复（跨所有 table）
- *  3. 班级冲突：同 tableId 内 day+period 重复
- * 返回 [{type, slotA, slotB, day, period, tableIdA, tableIdB}]
+ *  1. 教师冲突：同学期同 day+period 下 teacherId 重复（跨所有 table）
+ *  2. 教室冲突：同学期同 day+period 下 classroom 重复（跨所有 table）
+ *  3. 班级冲突：同 tableId 内 day+period 重复（tableId 本身已隔离学期）
+ * 返回 [{type, slotA, slotB, day, period, semester, tableIdA, tableIdB}]
  */
 export function detectConflicts(slots) {
   const list = (Array.isArray(slots) ? slots : []).filter((s) => s && toNum(s.deleted, 0) !== 1)
   const out = []
-  const byTerm = new Map()
+  // 教师/教室冲突按「学期 + day + period」分组：不同学期不互相比较。
+  // semester 形如 2024-2025-1 含连字符，故不能用 key.split('-') 反解 day/period，
+  // 直接从 slot 文档取 day/period。
+  const bySlotTime = new Map()
   for (const s of list) {
-    const key = `${toNum(s.day, 0)}-${toNum(s.period, 0)}`
-    if (!byTerm.has(key)) byTerm.set(key, [])
-    byTerm.get(key).push(s)
+    const key = `${String(s.semester || '')}-${toNum(s.day, 0)}-${toNum(s.period, 0)}`
+    if (!bySlotTime.has(key)) bySlotTime.set(key, [])
+    bySlotTime.get(key).push(s)
   }
-  for (const [key, group] of byTerm) {
-    const [day, period] = key.split('-').map(Number)
+  for (const group of bySlotTime.values()) {
     // 教师冲突
     const byTeacher = new Map()
     for (const s of group) {
       const tid = toNum(s.teacherId, 0)
       if (!tid) continue
-      if (byTeacher.has(tid)) out.push(conflict('教师冲突', byTeacher.get(tid), s, day, period))
+      if (byTeacher.has(tid)) out.push(conflict('教师冲突', byTeacher.get(tid), s))
       else byTeacher.set(tid, s)
     }
     // 教室冲突
@@ -107,7 +111,7 @@ export function detectConflicts(slots) {
     for (const s of group) {
       const room = String(s.classroom ?? '').trim()
       if (!room) continue
-      if (byRoom.has(room)) out.push(conflict('教室冲突', byRoom.get(room), s, day, period))
+      if (byRoom.has(room)) out.push(conflict('教室冲突', byRoom.get(room), s))
       else byRoom.set(room, s)
     }
   }
@@ -118,9 +122,7 @@ export function detectConflicts(slots) {
     if (!tid) continue
     const key = `${tid}-${toNum(s.day, 0)}-${toNum(s.period, 0)}`
     if (byClassTerm.has(key)) {
-      const day = toNum(s.day, 0)
-      const period = toNum(s.period, 0)
-      out.push(conflict('班级冲突', byClassTerm.get(key), s, day, period))
+      out.push(conflict('班级冲突', byClassTerm.get(key), s))
     } else byClassTerm.set(key, s)
   }
   return out

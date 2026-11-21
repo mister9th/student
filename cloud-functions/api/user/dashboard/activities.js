@@ -1,6 +1,7 @@
 /** GET /api/user/dashboard/activities —— 最近 5 条操作动态 */
 import { S, ok, fail, json } from '../../../_lib/store.js'
 import { ensureSeeded } from '../../../_lib/seed.js'
+import { requirePermission } from '../../../_lib/util.js'
 
 const FALLBACK = [
   { content: '系统管理员登录了系统', time: '10分钟前', type: 'info' },
@@ -11,6 +12,8 @@ const FALLBACK = [
 export async function onRequest(context) {
   try {
     await ensureSeeded()
+    const guard = await requirePermission(context, 'dashboard')
+    if (guard instanceof Response) return guard
     const store = S.logs()
     const { blobs } = await store.list({ prefix: 'oper/' })
     const logs = await Promise.all(blobs.map((b) => store.get(b.key, { type: 'json' })))

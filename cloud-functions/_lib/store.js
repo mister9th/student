@@ -97,8 +97,12 @@ export async function verifyToken(authHeader, secret) {
   } catch { return null }
 }
 
-/** JWT 密钥：必须由调用方从 context.env 传入（云函数内禁用 process.env） */
-export const jwtSecret = (env = {}) => env.JWT_SECRET || 'student-ai-system-secret-key-2025'
+/**
+ * JWT 签名密钥：必须由调用方从 context.env 注入 JWT_SECRET 环境变量覆盖。
+ * 生产环境必须注入 JWT_SECRET；此处仅保留演示用默认密钥，以保证未注入环境变量的
+ * 公开演示环境仍可登录（残留风险，见验收报告 A7）。
+ */
+export const jwtSecret = (env = {}) => env.JWT_SECRET || 'student-ai-system-demo-secret-change-in-production'
 
 /** 当前时间字符串 */
 export const now = () => new Date().toISOString().replace('T', ' ').slice(0, 19)

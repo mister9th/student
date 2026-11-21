@@ -1,13 +1,15 @@
 /** GET/PUT/DELETE /api/user/notice/{id} */
 import { S, ok, fail, json, bodyOf, now } from '../../../_lib/store.js'
 import { ensureSeeded } from '../../../_lib/seed.js'
-import { num, strip } from '../../../_lib/util.js'
+import { num, strip, requirePermission } from '../../../_lib/util.js'
 
 export async function onRequest(context) {
   try {
     await ensureSeeded()
     const id = String(context.params?.id || '').replace(/\D/g, '')
     const method = context.request.method
+    const guard = await requirePermission(context, 'notice')
+    if (guard instanceof Response) return guard
     const store = S.content()
     const key = `notices/${id}.json`
     const doc = await store.get(key, { type: 'json' })
