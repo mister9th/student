@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs'
 import { S, ok, fail, json, bodyOf, ensureUnique, now } from '../../../_lib/store.js'
 import { ensureSeeded } from '../../../_lib/seed.js'
 import { enc, val, num, strip, requirePermission } from '../../../_lib/util.js'
+import { loadClassesMap, overlayStudentClassFields } from '../../../_lib/score-join.js'
 
 export async function onRequest(context) {
   try {
@@ -17,7 +18,10 @@ export async function onRequest(context) {
 
     if (method === 'GET') {
       const doc = await academic.get(key, { type: 'json' })
-      return json(ok(!doc || doc.deleted === 1 ? null : strip(doc)))
+      if (!doc || doc.deleted === 1) return json(ok(null))
+      // 编辑表单回显：班级名以班级档案为权威，缺失时保留学生文档原值
+      const classes = await loadClassesMap()
+      return json(ok(strip(overlayStudentClassFields(doc, classes))))
     }
 
     const doc = await academic.get(key, { type: 'json' })
