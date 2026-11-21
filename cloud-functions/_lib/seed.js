@@ -361,7 +361,7 @@ async function writeSeed() {
       add(academic, `teachings/${tid}.json`, {
         id: tid, subjectId, subjectName: courseName,
         classId, className, teacherId, teacherName: teacherNames[teacherIdx],
-        semester, status: 1, createTime: ts, updateTime: ts, deleted: 0,
+        semester, weeklyPeriods: 2, status: 1, createTime: ts, updateTime: ts, deleted: 0,
       })
       sentinel(academic, `teaching/${subjectId}/${classId}/${semester}`)
     })

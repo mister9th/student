@@ -14,12 +14,22 @@ export function normalizeTeaching(body = {}, base = null) {
   const teacherId = num(pick('teacherId', 0), 0)
   const semester = String(pick('semester', '') ?? '').trim()
   const statusRaw = b.status !== undefined ? b.status : (base ? base.status : 1)
-  const data = { subjectId, classId, teacherId, semester, status: num(statusRaw, 1) === 0 ? 0 : 1 }
+  // 每周节数：1-10 整数，默认 2；存量 teaching 缺字段时按 2 处理（契约 §4.1）
+  const wpRaw = pick('weeklyPeriods', 2)
+  const weeklyPeriods = num(wpRaw, 2)
+  const data = {
+    subjectId, classId, teacherId, semester,
+    weeklyPeriods,
+    status: num(statusRaw, 1) === 0 ? 0 : 1,
+  }
   let error = null
   if (!subjectId) error = '科目不能为空'
   else if (!classId) error = '班级不能为空'
   else if (!teacherId) error = '教师不能为空'
   else if (!semester) error = '学期不能为空'
+  else if (!Number.isInteger(weeklyPeriods) || weeklyPeriods < 1 || weeklyPeriods > 10) {
+    error = '每周节数须为 1-10 的整数'
+  }
   return { error, data }
 }
 

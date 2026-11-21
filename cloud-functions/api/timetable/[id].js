@@ -41,6 +41,17 @@ export async function onRequest(context) {
       if (body.subjectCombo !== undefined && body.subjectCombo !== null) {
         patch.subjectCombo = String(body.subjectCombo).trim()
       }
+      // 单表覆盖全局课表配置（契约 §2.1），越界拒绝
+      if (body.days !== undefined && body.days !== null && body.days !== '') {
+        const days = num(body.days, 0)
+        if (!Number.isInteger(days) || days < 3 || days > 7) return json(fail('days 须为 3-7 的整数', 400), 400)
+        patch.days = days
+      }
+      if (body.periods !== undefined && body.periods !== null && body.periods !== '') {
+        const periods = num(body.periods, 0)
+        if (!Number.isInteger(periods) || periods < 4 || periods > 12) return json(fail('periods 须为 4-12 的整数', 400), 400)
+        patch.periods = periods
+      }
       await store.setJSON(key, { ...doc, ...patch })
       return json(ok(null))
     }

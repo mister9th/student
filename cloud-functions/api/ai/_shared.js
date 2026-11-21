@@ -40,10 +40,10 @@ export function aiConfig(env = {}) {
 }
 
 /**
- * 调用 AI Gateway（OpenAI 兼容 chat/completions）。
- * 无凭据 / 非 2xx / 无有效文本 → 返回 null，调用方必须规则兜底。
+ * 调用 AI Gateway（OpenAI 兼容 chat/completions），返回原始 assistant message。
+ * 无凭据 / 非 2xx / 无 message → 返回 null。askAI 与 askAIWithTools 共用。
  */
-export async function askAI(env, messages, options = {}) {
+async function callChatCompletion(env, payload, options = {}) {
   const { apiKey, baseURL, model } = aiConfig(env)
   if (!apiKey || !baseURL) return null
   const { temperature = 0.7, maxTokens = 1024 } = options
@@ -55,19 +55,123 @@ export async function askAI(env, messages, options = {}) {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({ model, messages, temperature, max_tokens: maxTokens }),
+      body: JSON.stringify({ model, ...payload, temperature, max_tokens: maxTokens }),
     })
     if (!res.ok) return null
     const data = await res.json()
-    const content = data && data.choices && data.choices[0] && data.choices[0].message
-      ? data.choices[0].message.content
-      : null
-    if (typeof content !== 'string') return null
-    const text = content.trim()
-    return text || null
+    const message = data && data.choices && data.choices[0] && data.choices[0].message
+    return message && typeof message === 'object' ? message : null
   } catch {
     return null
   }
+}
+
+/**
+ * 调用 AI Gateway（纯文本）。无凭据 / 非 2xx / 无有效文本 → 返回 null，
+ * 调用方必须规则兜底。原有语义保持不变。
+ */
+export async function askAI(env, messages, options = {}) {
+  const { model } = aiConfig(env)
+  const message = await callChatCompletion(env, { model, messages }, options)
+  if (!message || typeof message.content !== 'string') return null
+  const text = message.content.trim()
+  return text || null
+}
+
+/** 工具结果摘要（供前端卡片展示）：从工具返回的 JSON 文本里抽取关键字段 */
+function summarizeToolResult(name, content) {
+  try {
+    const o = typeof content === 'string' ? JSON.parse(content) : content
+    if (o && o.error) return `错误：${o.error}`
+    if (!o || typeof o !== 'object') return String(content || '').slice(0, 80)
+    const keys = ['studentName', 'courseName', 'className', 'count', 'total', 'avgScore',
+      'predictedScore', 'riskLevel', 'totalRisks', 'score', 'semester', 'grade']
+    const parts = []
+    for (const k of keys) if (o[k] !== undefined && o[k] !== null) parts.push(`${k}:${o[k]}`)
+    if (!parts.length) {
+      for (const k of Object.keys(o).slice(0, 3)) {
+        const v = o[k]
+        parts.push(`${k}:${Array.isArray(v) ? `[${v.length}项]` : (v && typeof v === 'object' ? '{...}' : v)}`)
+      }
+    }
+    return parts.slice(0, 4).join('，') || name
+  } catch {
+    return String(content || '').slice(0, 80)
+  }
+}
+
+/**
+ * Function calling 工具循环（契约 §5.1）。
+ * - 携带 tools + tool_choice:'auto' 调用模型
+ * - 解析 tool_calls，逐个执行注册工具的 run(args, context)，以
+ *   {role:'tool', tool_call_id, content} 追加后再次调用模型
+ * - 直到无 tool_calls 或达到 maxRounds（默认 3，防死循环）
+ * - 任何失败返回 null，调用方走规则兜底；工具明细写入 options.toolResults（数组，出参）
+ */
+export async function askAIWithTools(env, messages, tools, options = {}) {
+  const { apiKey, baseURL, model } = aiConfig(env)
+  if (!apiKey || !baseURL) return null
+
+  const registry = new Map()
+  for (const t of (Array.isArray(tools) ? tools : [])) {
+    if (t && t.name) registry.set(t.name, t)
+  }
+  const convo = Array.isArray(messages) ? [...messages] : []
+  const toolResults = Array.isArray(options.toolResults) ? options.toolResults : []
+  const maxRounds = Math.max(1, Math.min(5, num(options.maxRounds, 3)))
+  const toolContext = options.context || {}
+
+  for (let round = 0; round < maxRounds; round++) {
+    const message = await callChatCompletion(env, {
+      model,
+      messages: convo,
+      tools,
+      tool_choice: 'auto',
+    }, options)
+    if (!message) return null
+
+    const calls = Array.isArray(message.tool_calls) ? message.tool_calls : []
+    // OpenAI 协议要求：assistant(带 tool_calls) 必须先入会话，再跟 tool 消息
+    convo.push({
+      role: 'assistant',
+      content: typeof message.content === 'string' ? message.content : '',
+      tool_calls: calls,
+    })
+
+    if (!calls.length) {
+      return typeof message.content === 'string' && message.content.trim()
+        ? message.content.trim()
+        : null
+    }
+
+    for (const call of calls) {
+      const name = String((call && call.function && call.function.name) || '')
+      const rawArgs = call && call.function && call.function.arguments
+      let args = {}
+      try {
+        args = typeof rawArgs === 'string'
+          ? (rawArgs.trim() ? JSON.parse(rawArgs) : {})
+          : (rawArgs && typeof rawArgs === 'object' ? rawArgs : {})
+      } catch { args = {} }
+
+      const tool = registry.get(name)
+      let result
+      if (!tool || typeof tool.run !== 'function') {
+        result = { error: `未知工具: ${name}` }
+      } else {
+        try {
+          result = await tool.run(args, toolContext)
+        } catch (e) {
+          result = { error: (e && e.message) || '工具执行失败' }
+        }
+      }
+      const content = typeof result === 'string' ? result : JSON.stringify(result || {})
+      toolResults.push({ name, args, summary: summarizeToolResult(name, content) })
+      convo.push({ role: 'tool', tool_call_id: String((call && call.id) || name), content })
+    }
+  }
+  // 超过轮次仍未收敛：放弃，交给调用方规则兜底
+  return null
 }
 
 /** 列出某前缀下所有 JSON 文档（附 __key，按 key 排序，即写入时间顺序） */
@@ -232,7 +336,7 @@ export function extractRiskLevel(text) {
 }
 
 /** 把一条对话消息追加到 Blob：chats/<sessionId>/<时间戳>-<序号>.json */
-export async function appendChatMessage(storeObj, sessionId, role, content) {
+export async function appendChatMessage(storeObj, sessionId, role, content, extra = {}) {
   const prefix = `chats/${sessionId}/`
   let seq = 0
   try {
@@ -248,6 +352,7 @@ export async function appendChatMessage(storeObj, sessionId, role, content) {
     content: String(content),
     createTime: ts,
     time: clock,
+    ...extra,
   })
   return key
 }

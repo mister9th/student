@@ -15,16 +15,31 @@ export async function onRequest(context) {
     const examType = q.examType ? Number(q.examType) : null
     const semester = q.semester ? String(q.semester).trim() : ''
     const examName = q.examName ? String(q.examName).trim() : ''
+    const studentName = q.studentName ? String(q.studentName).trim() : ''
+
+    const guard = await requirePermission(context, 'score:list')
+    if (guard instanceof Response) return guard
+
+    // 自定义姓名：按 students/ 文档 realName 模糊反查 studentId 集合（在 filter 前算一次）
+    let nameIds = null
+    if (studentName) {
+      const academic = S.academic()
+      const { blobs } = await academic.list({ prefix: 'students/' })
+      const docs = await Promise.all(blobs.map((b) => academic.get(b.key, { type: 'json' })))
+      nameIds = new Set(docs
+        .filter((d) => d && d.deleted !== 1 && String(d.realName || '').includes(studentName))
+        .map((d) => Number(d.id)))
+    }
+
     let filter = (x) =>
       (!studentId || Number(x.studentId) === studentId) &&
       (!subjectId || Number(x.subjectId) === subjectId) &&
       (!classId || Number(x.classId) === classId) &&
       (!examType || Number(x.examType) === examType) &&
       (!semester || String(x.semester || '') === semester) &&
-      (!examName || String(x.examName || '').includes(examName))
+      (!examName || String(x.examName || '').includes(examName)) &&
+      (!nameIds || nameIds.has(Number(x.studentId)))
 
-    const guard = await requirePermission(context, 'score:list')
-    if (guard instanceof Response) return guard
     // K12-P4 §3.2：五级 scope 统一过滤；前端 classId/studentId/subjectId 只作收窄
     const scope = await buildScope(context)
     const base = filter

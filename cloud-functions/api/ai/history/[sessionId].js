@@ -16,7 +16,6 @@ export async function onRequest(context) {
     const method = String((context.request && context.request.method) || 'GET').toUpperCase()
     if (method !== 'GET') return json(fail('仅支持 GET 请求', 405), 405)
 
-    // 仅要求登录并具备 ai:chat；sessionId 归属强校验暂不实施（见验收报告 A5 残留风险）
     const guard = await requirePermission(context, 'ai:chat')
     if (guard instanceof Response) return guard
 
@@ -38,10 +37,16 @@ export async function onRequest(context) {
     }
     if (!sessionId) return json(fail('缺少 sessionId', 400), 400)
 
+    // 归属校验：sessionId 必须带当前用户前缀（契约 §5.3），否则视为无数据，防止跨用户读取
+    try { sessionId = decodeURIComponent(sessionId) } catch { /* 保持原值 */ }
+    const uid = guard.id !== undefined ? guard.id : guard.userId
+    if (!String(sessionId).startsWith(`${uid}-`)) return json(ok([]))
+
     const docs = await listDocs(S.ai(), `chats/${sessionId}/`)
     const rows = docs.map((h) => ({
       role: pick(h, 'role') === 'assistant' ? 'assistant' : 'user',
       content: String(pick(h, 'content', 'message') || ''),
+      toolResults: Array.isArray(pick(h, 'toolResults')) ? pick(h, 'toolResults') : [],
       time: String(pick(h, 'time') || ''),
     }))
 

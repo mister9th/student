@@ -44,7 +44,11 @@ export async function onRequest(context) {
       deleted: 0,
     })
     await writeOperLog(context, { module: '课表管理', operation: '新建课表' })
-    return json(ok({ id, classId: data.classId, semester: data.semester, type: data.type, subjectCombo: data.subjectCombo, status: data.status }))
+    return json(ok({
+      id, classId: data.classId, semester: data.semester, type: data.type,
+      subjectCombo: data.subjectCombo, status: data.status,
+      days: data.days ?? null, periods: data.periods ?? null,
+    }))
   } catch (e) {
     return json(fail(e?.message || '创建课表失败', 500))
   }

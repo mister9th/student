@@ -3,6 +3,7 @@ import { S, ok, fail, json, bodyOf, nextId, now } from '../../../_lib/store.js'
 import { ensureSeeded } from '../../../_lib/seed.js'
 import { requirePermission, num } from '../../../_lib/util.js'
 import { normalizeSlot, checkConflicts } from '../_shared.js'
+import { readLimits, validDays, validPeriods } from '../_settings.js'
 import { writeOperLog } from '../../../_lib/oper-log.js'
 
 export async function onRequest(context) {
@@ -18,16 +19,24 @@ export async function onRequest(context) {
     const table = await store.get(key, { type: 'json' })
     if (!table || table.deleted === 1) return json(fail('课表不存在', 400))
 
+    // 单表 days/periods 优先；缺失/非法回退全局 timetable-settings（默认 5×8）
+    const globalLimits = await readLimits(S.config())
+    const limits = {
+      days: validDays(table.days) ?? globalLimits.days,
+      periods: validPeriods(table.periods) ?? globalLimits.periods,
+    }
+    const maxSlots = limits.days * limits.periods
+
     const body = await bodyOf(context.request)
     const rawSlots = Array.isArray(body?.slots) ? body.slots : (Array.isArray(body) ? body : null)
     if (!rawSlots) return json(fail('slots 须为数组', 400))
-    if (rawSlots.length > 40) return json(fail('每节课表最多 40 个课时（5 天 × 8 节）', 400))
+    if (rawSlots.length > maxSlots) return json(fail(`每节课表最多 ${maxSlots} 个课时（${limits.days} 天 × ${limits.periods} 节）`, 400))
 
     // 先分配最终 id，使冲突详情里的 slotA/slotB 可直接对应前端课时
     const baseId = await nextId(store, 'slots/')
     const candidates = []
     for (let i = 0; i < rawSlots.length; i++) {
-      const { error, data } = normalizeSlot(rawSlots[i], id)
+      const { error, data } = normalizeSlot(rawSlots[i], id, null, limits)
       if (error) return json(fail(`第 ${i + 1} 个课时：${error}`, 400))
       // B3：从 table 文档注入学期，使冲突检测按学期隔离
       candidates.push({ ...data, id: baseId + i, semester: String(table.semester || '') })

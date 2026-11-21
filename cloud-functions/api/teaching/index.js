@@ -26,7 +26,7 @@ export async function onRequest(context) {
       id, ...data, ...names, createTime: ts, updateTime: ts, deleted: 0,
     })
     await store.setJSON(sentinel, { id, createdAt: Date.now() }, { onlyIfNew: true })
-    return json(ok({ id }))
+    return json(ok({ id, weeklyPeriods: data.weeklyPeriods }))
   } catch (e) {
     return json(fail(e?.message || '新增授课关系失败', 500))
   }

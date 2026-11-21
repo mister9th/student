@@ -34,17 +34,36 @@ export function normalizeTable(body = {}, base = null) {
   if (!['行政', '走班'].includes(type)) return { error: '课表类型须为 行政 或 走班', data: null }
   const subjectCombo = String(pick('subjectCombo', '') ?? '').trim()
   const status = toNum(pick('status', 0), 0) === 1 ? 1 : 0
-  return { error: null, data: { classId, semester, type, subjectCombo, status } }
+  const data = { classId, semester, type, subjectCombo, status }
+  // 单表覆盖全局配置：仅显式提供（body 或旧文档）时落字段，缺省不写以回退全局 settings
+  const rawDays = pick('days', null)
+  if (rawDays !== null && rawDays !== undefined && rawDays !== '') {
+    const days = toNum(rawDays, 0)
+    if (!Number.isInteger(days) || days < 3 || days > 7) return { error: 'days 须为 3-7 的整数', data: null }
+    data.days = days
+  }
+  const rawPeriods = pick('periods', null)
+  if (rawPeriods !== null && rawPeriods !== undefined && rawPeriods !== '') {
+    const periods = toNum(rawPeriods, 0)
+    if (!Number.isInteger(periods) || periods < 4 || periods > 12) return { error: 'periods 须为 4-12 的整数', data: null }
+    data.periods = periods
+  }
+  return { error: null, data }
 }
 
-/** 归一化单个 slot。tableId 由服务端注入，不信前端传值。返回 {error, data} */
-export function normalizeSlot(raw = {}, tableId = 0, base = null) {
+/**
+ * 归一化单个 slot。tableId 由服务端注入，不信前端传值。
+ * limits 第 4 参来自单表 days/periods 或全局 settings（默认 5×8）。返回 {error, data}
+ */
+export function normalizeSlot(raw = {}, tableId = 0, base = null, limits = { days: 5, periods: 8 }) {
   const b = raw && typeof raw === 'object' ? raw : {}
   const pick = pickOf(b, base)
+  const maxDay = toNum(limits && limits.days, 5) || 5
+  const maxPeriod = toNum(limits && limits.periods, 8) || 8
   const day = toNum(pick('day', 0), 0)
   const period = toNum(pick('period', 0), 0)
-  if (!Number.isInteger(day) || day < 1 || day > 5) return { error: 'day 须为 1-5 的整数', data: null }
-  if (!Number.isInteger(period) || period < 1 || period > 8) return { error: 'period 须为 1-8 的整数', data: null }
+  if (!Number.isInteger(day) || day < 1 || day > maxDay) return { error: `day 须为 1-${maxDay} 的整数`, data: null }
+  if (!Number.isInteger(period) || period < 1 || period > maxPeriod) return { error: `period 须为 1-${maxPeriod} 的整数`, data: null }
   const subjectId = toNum(pick('subjectId', 0), 0)
   const teacherId = toNum(pick('teacherId', 0), 0)
   if (!subjectId) return { error: '科目不能为空', data: null }
