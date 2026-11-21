@@ -2,6 +2,7 @@
 import { S, ok, fail, json } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
 import { requirePermission, num, pagedOrdered, stripRecords } from '../../_lib/util.js'
+import { buildScope } from '../../_lib/scope.js'
 import { ownStudentProfile } from './_shared.js'
 
 export async function onRequest(context) {
@@ -17,9 +18,11 @@ export async function onRequest(context) {
       const profile = await ownStudentProfile(guard, S.academic())
       ownSid = profile ? num(profile.id, 0) : -1
     }
+    const scope = await buildScope(context)
     const filter = (s) =>
       (!assignmentId || num(s.assignmentId, 0) === assignmentId) &&
-      (!isStudent || num(s.studentId, 0) === ownSid)
+      (!isStudent || num(s.studentId, 0) === ownSid) &&
+      scope.filterFn(s)
     return json(ok(stripRecords(await pagedOrdered(S.homework(), 'submissions/', q, filter, false))))
   } catch (e) {
     return json(fail(e?.message || '查询提交失败', 500))

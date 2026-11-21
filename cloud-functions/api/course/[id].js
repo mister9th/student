@@ -2,6 +2,7 @@
 import { S, ok, fail, json, bodyOf, now } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
 import { val, num, strip, requirePermission } from '../../_lib/util.js'
+import { teacherNameByUserId } from '../../_lib/teacher.js'
 
 const validStage = (v) => [1, 2, 3].includes(num(v, 0))
 
@@ -28,17 +29,15 @@ export async function onRequest(context) {
       const stage = body.stage !== undefined ? num(body.stage, doc.stage) : doc.stage
       if (body.stage !== undefined && !validStage(stage)) return json(fail('学段不合法（1=小学 2=初中 3=高中）', 400))
       const teacherId = body.teacherId !== undefined ? val(body.teacherId, null) : doc.teacherId
-      let teacherName = doc.teacherName || ''
-      if (body.teacherId !== undefined) {
-        const t = teacherId !== null ? await store.get(`teachers/${teacherId}.json`, { type: 'json' }) : null
-        teacherName = t?.realName || ''
-      }
+      const teacherName = body.teacherId !== undefined
+        ? await teacherNameByUserId(store, teacherId, body.teacherName)
+        : (doc.teacherName || '')
       await store.setJSON(key, {
         ...doc,
         courseName: body.courseName !== undefined ? String(body.courseName || '') : doc.courseName,
         teacherId, teacherName, stage,
         gradeScope: body.gradeScope !== undefined ? String(body.gradeScope || '') : doc.gradeScope,
-        maxStudent: body.maxStudent !== undefined ? num(body.maxStudent, 100) : doc.maxStudent,
+        // K12-P4 §1.1：不再从 body 接收 maxStudent，残留字段沿用旧值
         semester: body.semester !== undefined ? String(body.semester || '') : doc.semester,
         status: body.status !== undefined ? num(body.status, 0) : doc.status,
         updateTime: now(),

@@ -10,6 +10,7 @@
  */
 import { ensureSeeded } from '../../_lib/seed.js'
 import { requirePermission } from '../../_lib/util.js'
+import { buildScope } from '../../_lib/scope.js'
 import { S, ok, fail, json, bodyOf } from '../../_lib/store.js'
 import {
   askAI, pick, num, clamp, getDoc, scoresOf, courseMap, studentName,
@@ -33,6 +34,10 @@ export async function onRequest(context) {
     }
     if (!studentId || !courseId) return json(fail('缺少 studentId 或 courseId', 400), 400)
     const studentDoc = await getDoc(academic, `students/${studentId}.json`)
+    const scope = await buildScope(context)
+    if (!scope.filterFn({ studentId, classId: studentDoc?.classId, grade: studentDoc?.grade })) {
+      return json(fail('无权预测该学生', 403), 403)
+    }
     const courses = await courseMap()
     const courseDoc = courses.get(courseId) || (await getDoc(academic, `courses/${courseId}.json`))
 

@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs'
 import { S, ok, fail, json, bodyOf, ensureUnique, now } from '../../../_lib/store.js'
 import { ensureSeeded } from '../../../_lib/seed.js'
 import { enc, val, num, strip, requirePermission } from '../../../_lib/util.js'
+import { buildScope } from '../../../_lib/scope.js'
 import { loadClassesMap, overlayStudentClassFields } from '../../../_lib/score-join.js'
 
 export async function onRequest(context) {
@@ -12,6 +13,7 @@ export async function onRequest(context) {
     const method = context.request.method
     const guard = await requirePermission(context, method === 'GET' ? 'student:list' : 'student:edit')
     if (guard instanceof Response) return guard
+    const scope = await buildScope(context)
     const auth = S.auth()
     const academic = S.academic()
     const key = `students/${id}.json`
@@ -19,6 +21,7 @@ export async function onRequest(context) {
     if (method === 'GET') {
       const doc = await academic.get(key, { type: 'json' })
       if (!doc || doc.deleted === 1) return json(ok(null))
+      if (!scope.filterFn(doc, { studentField: 'id' })) return json(ok(null))
       // 编辑表单回显：班级名以班级档案为权威，缺失时保留学生文档原值
       const classes = await loadClassesMap()
       return json(ok(strip(overlayStudentClassFields(doc, classes))))
@@ -26,6 +29,7 @@ export async function onRequest(context) {
 
     const doc = await academic.get(key, { type: 'json' })
     if (!doc || doc.deleted === 1) return json(ok(null))
+    if (!scope.filterFn(doc, { studentField: 'id' })) return json(fail('无权操作该学生', 403), 403)
 
     if (method === 'DELETE') {
       await academic.setJSON(key, { ...doc, deleted: 1, updateTime: now() })

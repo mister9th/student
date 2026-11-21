@@ -9,6 +9,7 @@
  */
 import { ensureSeeded } from '../../_lib/seed.js'
 import { requirePermission } from '../../_lib/util.js'
+import { buildScope } from '../../_lib/scope.js'
 import { S, ok, fail, json, bodyOf } from '../../_lib/store.js'
 import {
   askAI, pick, num, getDoc, scoresOf, classMap, studentName,
@@ -46,6 +47,11 @@ export async function onRequest(context) {
     }
     if (!studentId) return json(fail('缺少 studentId', 400), 400)
     const studentDoc = await getDoc(academic, `students/${studentId}.json`)
+    // 非学生用户也只能分析自己 scope 内的学生
+    const scope = await buildScope(context)
+    if (!scope.filterFn({ studentId, classId: studentDoc?.classId, grade: studentDoc?.grade })) {
+      return json(fail('无权分析该学生', 403), 403)
+    }
     const scores = await scoresOf(studentId)
     const valid = scores.map(scoreValue).filter((v) => v > 0)
     const avg = valid.length

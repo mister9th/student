@@ -2,6 +2,8 @@
 import { S, ok, fail, json, bodyOf, nextId, now } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
 import { num, k12GradeOf, currentSemester, requirePermission } from '../../_lib/util.js'
+import { loadTeachings, findTeachingTeacherId } from '../../_lib/score-join.js'
+import { buildScope } from '../../_lib/scope.js'
 
 const pad2 = (n) => String(n).padStart(2, '0')
 const today = () => {
@@ -43,6 +45,19 @@ export async function onRequest(context) {
     const subject = await store.get(`courses/${subjectId}.json`, { type: 'json' })
     const semester = exam ? String(exam.semester || '')
       : (String(body.semester || '').trim() || subject?.semester || currentSemester())
+
+    // K12-P4 §2：teacherId 优先按 (subjectId, 学生 classId, semester) 查授课关系，
+    // 查不到回退 course.teacherId（兼容存量）。
+    const classId = student?.classId ?? null
+    const taughtTeacherId = findTeachingTeacherId({ teachings: await loadTeachings() }, subjectId, classId, semester)
+    const teacherId = taughtTeacherId !== null ? taughtTeacherId : (subject?.teacherId ?? null)
+
+    // K12-P4 §3.2：教师写操作必须落在自己的 scope 内，防止跨班/跨科录入
+    const scope = await buildScope(context)
+    if (!scope.filterFn({ studentId, classId, subjectId, semester })) {
+      return json(fail('无权为该学生/科目录入成绩', 403), 403)
+    }
+
     const id = await nextId(store, 'scores/')
     const ts = now()
     await store.setJSON(`scores/${id}.json`, {
@@ -51,7 +66,7 @@ export async function onRequest(context) {
       subjectId, subjectName: subject?.courseName || '',
       examId, examName, examType, examDate, semester,
       score, gradeLevel: k12GradeOf(score),
-      teacherId: subject?.teacherId ?? null, comment: String(body.comment || ''),
+      teacherId, comment: String(body.comment || ''),
       createTime: ts, updateTime: ts, deleted: 0,
     })
     return json(ok({ id }))

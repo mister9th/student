@@ -9,6 +9,7 @@
  */
 import { ensureSeeded } from '../../_lib/seed.js'
 import { requirePermission } from '../../_lib/util.js'
+import { buildScope, applyScope } from '../../_lib/scope.js'
 import { S, ok, fail, json, bodyOf } from '../../_lib/store.js'
 import {
   askAI, pick, num, allScores, courseMap, classMap, studentMap,
@@ -37,9 +38,11 @@ export async function onRequest(context) {
       filterClassId = ownClassId
     }
 
-    const [scores, courses, classes, students] = await Promise.all([
+    const [all, courses, classes, students] = await Promise.all([
       allScores(), courseMap(), classMap(), studentMap(),
     ])
+    // 统一 scope：学生本人、班主任本班、科任本科目本班、组长本年级、管理员全量
+    const scores = applyScope(all, await buildScope(context))
 
     const lowScores = scores
       .filter((s) => {

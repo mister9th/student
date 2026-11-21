@@ -2,6 +2,7 @@
 import { S, ok, fail, json } from '../../../_lib/store.js'
 import { ensureSeeded } from '../../../_lib/seed.js'
 import { requirePermission, currentUser, num, pagedOrdered, stripRecords } from '../../../_lib/util.js'
+import { buildScope } from '../../../_lib/scope.js'
 import { ownStudentId } from './_fiveedu.js'
 
 const EMPTY = { total: 0, records: [], page: 1, pageSize: 10, totalPages: 0 }
@@ -24,11 +25,13 @@ export async function onRequest(context) {
       own = await ownStudentId(user, S.academic())
       if (!own) return json(ok(EMPTY))
     }
+    const scope = await buildScope(context)
     const filter = (x) =>
       (!dimension || String(x.dimension || '') === dimension) &&
       (!semester || String(x.semester || '') === semester) &&
       (isStudent ? num(x.studentId, 0) === own : (!studentId || num(x.studentId, 0) === studentId)) &&
-      (isStudent || !classId || num(x.classId, 0) === classId)
+      (isStudent || !classId || num(x.classId, 0) === classId) &&
+      scope.filterFn(x)
     return json(ok(stripRecords(await pagedOrdered(S.moral(), 'fiveedu/', q, filter, false))))
   } catch (e) {
     return json(fail(e?.message || '查询五育记录失败', 500))

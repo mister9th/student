@@ -9,6 +9,7 @@
  */
 import { ensureSeeded } from '../../_lib/seed.js'
 import { requirePermission } from '../../_lib/util.js'
+import { buildScope } from '../../_lib/scope.js'
 import { S, ok, fail, json, bodyOf, now } from '../../_lib/store.js'
 import { STAGES, GRADE_NAMES, gradeLabel, k12GradeOf, currentSemester } from '../../_lib/k12.js'
 import {
@@ -104,6 +105,11 @@ export async function onRequest(context) {
     const commentType = String(pick(body, 'commentType', 'comment_type') || 'semester')
     const term = String(pick(body, 'term', 'semester') || '')
     if (!studentId) return json(fail('缺少 studentId', 400), 400)
+    const target = await getDoc(S.academic(), `students/${studentId}.json`)
+    const scope = await buildScope(context)
+    if (!scope.filterFn({ studentId, classId: target?.classId, grade: target?.grade })) {
+      return json(fail('无权为该学生生成评语', 403), 403)
+    }
 
     const result = await buildComment(context, studentId, commentType, term)
     // 落库评语记录（失败不影响主流程）

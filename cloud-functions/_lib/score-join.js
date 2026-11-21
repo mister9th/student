@@ -33,17 +33,19 @@ function byId(docs) {
 }
 
 /**
- * 加载联表映射：students / courses / exams / classes（Map<id, doc>）。
+ * 加载联表映射：students / courses / exams / classes / teachings。
  * exams 额外按 examName 建一份索引，用于存量成绩无 examId 时的补偿匹配。
  * classes 是班级名的权威源（班级管理页改名落在此处）。
+ * teachings 是 teacherId 的权威源（K12-P4 §2：按 subject/class/semester 反查任课教师）。
  */
 export async function loadScoreJoinMaps() {
   const academic = S.academic()
-  const [students, courses, exams, classes] = await Promise.all([
+  const [students, courses, exams, classes, teachings] = await Promise.all([
     docsOf(academic, 'students/'),
     docsOf(academic, 'courses/'),
     docsOf(S.exam(), 'exams/'),
     docsOf(academic, 'classes/'),
+    docsOf(academic, 'teachings/'),
   ])
   const examsByName = new Map()
   for (const e of exams) {
@@ -56,7 +58,28 @@ export async function loadScoreJoinMaps() {
     exams: byId(exams),
     classes: byId(classes),
     examsByName,
+    teachings,
   }
+}
+
+/** 仅加载授课关系文档（写成绩时解析 teacherId 用） */
+export async function loadTeachings() {
+  return docsOf(S.academic(), 'teachings/')
+}
+
+/**
+ * 按 (subjectId, classId, semester) 查授课关系取 teacherId，查不到返回 null。
+ * 供写成绩与读时覆盖共用，保证口径一致。
+ */
+export function findTeachingTeacherId(maps, subjectId, classId, semester) {
+  const list = maps && maps.teachings
+  if (!Array.isArray(list) || !list.length) return null
+  const sid = num(subjectId, 0)
+  const cid = num(classId, 0)
+  const sem = String(semester || '')
+  const hit = list.find((t) => t && t.deleted !== 1 && num(t.status, 1) !== 0 &&
+    num(t.subjectId, 0) === sid && num(t.classId, 0) === cid && String(t.semester || '') === sem)
+  return hit && hit.teacherId !== undefined && hit.teacherId !== null ? hit.teacherId : null
 }
 
 /** 仅加载班级映射的轻量函数，返回与 loadScoreJoinMaps 同形的 { classes } */
@@ -110,6 +133,11 @@ export function overlayScoreFields(record, maps) {
     if (nonempty(exam.examDate)) out.examDate = exam.examDate
     if (nonempty(exam.semester)) out.semester = exam.semester
   }
+
+  // teacherId 以授课关系为权威：按 (subjectId, classId, semester) 反查任课教师；
+  // 查不到时保留上面 course.teacherId 的回退值（兼容存量）。
+  const taughtTeacherId = findTeachingTeacherId(maps, out.subjectId, out.classId, out.semester)
+  if (taughtTeacherId !== null) out.teacherId = taughtTeacherId
 
   // 班级名以班级文档为权威：此时 out.classId 已取学生文档值，按它查班级覆盖。
   // 班级映射缺失或 className 为空时，保留上面学生文档/成绩冗余的回退值。

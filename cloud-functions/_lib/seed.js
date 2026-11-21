@@ -353,6 +353,28 @@ async function writeSeed() {
     })
   })
 
+  // ---- 授课关系（K12-P4 §1.3：班级 × 该学段科目 × 教师；teacherId 取课程口径，与成绩一致）----
+  // 同一 (科目, 班级, 学期) 唯一，哨兵去重；学期与演示成绩对齐，便于 teacherId 反查。
+  let teachingId = 1
+  classSeed.forEach(([className, stage], ci) => {
+    courseSeed.forEach(([courseName, courseStage], sIdx) => {
+      if (courseStage !== stage) return
+      const subjectId = sIdx + 1
+      const classId = ci + 1
+      const semester = '2024-2025-1'
+      const teacherIdx = sIdx % teacherNames.length
+      const teacherId = 2001 + teacherIdx
+      const ts = '2024-08-25 10:00:00'
+      const tid = teachingId++
+      add(academic, `teachings/${tid}.json`, {
+        id: tid, subjectId, subjectName: courseName,
+        classId, className, teacherId, teacherName: teacherNames[teacherIdx],
+        semester, status: 1, createTime: ts, updateTime: ts, deleted: 0,
+      })
+      sentinel(academic, `teaching/${subjectId}/${classId}/${semester}`)
+    })
+  })
+
   // ---- 成绩 72 条（K12 单考次模型，冗余展示字段避免 JOIN；不再生成 selections）----
   for (let i = 0; i < studentNames.length; i++) {
     for (let j = 0; j < 3; j++) {

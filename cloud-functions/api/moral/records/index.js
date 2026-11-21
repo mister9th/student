@@ -2,6 +2,7 @@
 import { S, ok, fail, json, bodyOf, nextId, now } from '../../../_lib/store.js'
 import { ensureSeeded } from '../../../_lib/seed.js'
 import { requirePermission, num, pagedOrdered, stripRecords } from '../../../_lib/util.js'
+import { buildScope } from '../../../_lib/scope.js'
 import { ownStudentId } from '../fiveedu/_fiveedu.js'
 
 export async function onRequest(context) {
@@ -21,16 +22,22 @@ export async function onRequest(context) {
       }
       const status = q.status ? String(q.status) : ''
       const category = q.category ? String(q.category) : ''
+      const scope = await buildScope(context)
       const filter = (x) =>
         (!studentId || Number(x.studentId) === studentId) &&
         (!status || x.status === status) &&
-        (!category || String(x.category || '') === category)
+        (!category || String(x.category || '') === category) &&
+        scope.filterFn(x)
       return json(ok(stripRecords(await pagedOrdered(store, 'records/', q, filter, false))))
     }
     if (method === 'POST') {
       const body = await bodyOf(context.request)
       const studentId = num(body.studentId, 0)
       const student = await S.academic().get(`students/${studentId}.json`, { type: 'json' })
+      const scope = await buildScope(context)
+      if (!scope.filterFn({ studentId, classId: student?.classId, grade: student?.grade })) {
+        return json(fail('无权为该学生新增德育记录', 403), 403)
+      }
       const id = await nextId(store, 'records/')
       await store.setJSON(`records/${id}.json`, {
         id,

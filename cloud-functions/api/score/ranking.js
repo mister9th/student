@@ -6,6 +6,7 @@ import { S, ok, fail, json } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
 import { currentUser, requirePermission, num } from '../../_lib/util.js'
 import { loadScoreJoinMaps, overlayScoreFields } from '../../_lib/score-join.js'
+import { buildScope } from '../../_lib/scope.js'
 
 /** 学生用户 -> 学生档案 id（student.userId === user.id），找不到返回 0 */
 async function ownStudentId(user, academic) {
@@ -37,6 +38,8 @@ export async function onRequest(context) {
     const guard = await requirePermission(context, isStudent ? 'score:list' : 'score:ranking')
     if (guard instanceof Response) return guard
     const user = guard
+    // 学生分支保留原有强制本人逻辑；非学生分支接入五级 scope
+    const scope = isStudent ? null : await buildScope(context)
     const q = context.request.query || {}
     const academic = S.academic()
     const examStore = S.exam()
@@ -78,8 +81,9 @@ export async function onRequest(context) {
       if (isStudent) {
         // 学生强制只看自己：忽略传入 studentId/classId
         if (!ownSid || num(s.studentId, 0) !== ownSid) continue
-      } else if (sidQ && num(s.studentId, 0) !== sidQ) {
-        continue
+      } else {
+        if (sidQ && num(s.studentId, 0) !== sidQ) continue
+        if (!scope.filterFn(s)) continue
       }
       const score = num(s.score, 0)
       rows.push({

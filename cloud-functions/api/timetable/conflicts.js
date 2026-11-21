@@ -2,7 +2,8 @@
 import { S, ok, fail, json } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
 import { requirePermission, num } from '../../_lib/util.js'
-import { checkConflicts, ownStudentClassId } from './_shared.js'
+import { buildScope } from '../../_lib/scope.js'
+import { checkConflicts } from './_shared.js'
 
 export async function onRequest(context) {
   try {
@@ -13,16 +14,26 @@ export async function onRequest(context) {
     const q = context.request.query || {}
     const tableId = q.tableId ? num(q.tableId, 0) : 0
     const store = S.timetable()
+    const scope = await buildScope(context)
 
-    if (tableId && Number(guard.userType) === 1) {
-      // 学生端防御：非本人本班课表不返回冲突信息
+    if (tableId) {
+      // 目标课表必须在 scope 内（原学生端防御扩展为五级）
       const table = await store.get(`tables/${tableId}.json`, { type: 'json' })
-      const ownClassId = await ownStudentClassId(guard, S.academic())
-      if (!table || table.deleted === 1 || !ownClassId || num(table.classId, 0) !== ownClassId) {
+      if (!table || table.deleted === 1 || !scope.filterFn(table, { by: 'class' })) {
         return json(ok({ conflicts: [] }))
       }
     }
-    const conflicts = await checkConflicts(store, tableId)
+    let conflicts = await checkConflicts(store, tableId)
+    if (scope.type !== 'admin') {
+      // 冲突双方课表都必须可见，避免跨班级信息泄露
+      const { blobs: tBlobs } = await store.list({ prefix: 'tables/' })
+      const tables = await Promise.all(tBlobs.map((b) => store.get(b.key, { type: 'json' })))
+      const allowed = new Set(tables
+        .filter((t) => t && t.deleted !== 1 && scope.filterFn(t, { by: 'class' }))
+        .map((t) => num(t.id, 0)))
+      conflicts = conflicts.filter((c) =>
+        allowed.has(num(c.tableIdA, 0)) && allowed.has(num(c.tableIdB, 0)))
+    }
     return json(ok({ conflicts }))
   } catch (e) {
     return json(fail(e?.message || '查询冲突失败', 500))

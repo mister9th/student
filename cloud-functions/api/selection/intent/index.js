@@ -2,6 +2,7 @@
 import { S, ok, fail, json, bodyOf, nextId, now } from '../../../_lib/store.js'
 import { ensureSeeded } from '../../../_lib/seed.js'
 import { requirePermission, num, pagedOrdered, stripRecords } from '../../../_lib/util.js'
+import { buildScope } from '../../../_lib/scope.js'
 import { ownStudentProfile, normalizeIntent } from '../_shared.js'
 import { writeOperLog } from '../../../_lib/oper-log.js'
 
@@ -14,6 +15,7 @@ export async function onRequest(context) {
     const academic = S.academic()
     const store = S.selection()
     const isStudent = Number(guard.userType) === 1
+    const scope = await buildScope(context)
 
     if (method === 'GET') {
       const q = context.request.query || {}
@@ -27,7 +29,8 @@ export async function onRequest(context) {
         (!isStudent || num(x.studentId, 0) === ownSid) &&
         (isStudent || (!studentIdQ || num(x.studentId, 0) === studentIdQ)) &&
         (!classId || num(x.classId, 0) === classId) &&
-        (!grade || num(x.grade, 0) === grade)
+        (!grade || num(x.grade, 0) === grade) &&
+        scope.filterFn(x)
       return json(ok(stripRecords(await pagedOrdered(store, 'intents/', q, filter, false))))
     }
 
@@ -49,6 +52,7 @@ export async function onRequest(context) {
       }
       const { error, data } = normalizeIntent(body, profile, forcedSid)
       if (error) return json(fail(error, 400))
+      if (!scope.filterFn(data)) return json(fail('无权为该学生提交选科意愿', 403), 403)
 
       const sentinelKey = `intent/${data.studentId}/${data.semester}`
       const ts = now()

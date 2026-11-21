@@ -2,6 +2,7 @@
 import { S, ok, fail, json, bodyOf, nextId, now } from '../../../_lib/store.js'
 import { ensureSeeded } from '../../../_lib/seed.js'
 import { requirePermission, num } from '../../../_lib/util.js'
+import { buildScope } from '../../../_lib/scope.js'
 import { DIMENSIONS, scoreOf, applyFiveEduDelta, rebuildFiveEdu } from './_fiveedu.js'
 import { writeOperLog } from '../../../_lib/oper-log.js'
 
@@ -26,6 +27,11 @@ export async function onRequest(context) {
     const academic = S.academic()
     const student = await academic.get(`students/${studentId}.json`, { type: 'json' })
     if (!student || student.deleted === 1) return json(fail('学生档案不存在', 400))
+    // scope 校验：教师只能给自己带班/任教班的学生打标
+    const scope = await buildScope(context)
+    if (!scope.filterFn({ studentId, classId: student.classId, grade: student.grade })) {
+      return json(fail('无权为该学生打五育标', 403), 403)
+    }
 
     const store = S.moral()
     const id = await nextId(store, 'fiveedu/')

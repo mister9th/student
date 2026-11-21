@@ -2,6 +2,7 @@
 import { S, ok, fail, json, bodyOf, now } from '../../../_lib/store.js'
 import { ensureSeeded } from '../../../_lib/seed.js'
 import { currentUser, requirePermission, num } from '../../../_lib/util.js'
+import { buildScope } from '../../../_lib/scope.js'
 import { currentSemester } from '../../../_lib/k12.js'
 import { pick } from '../_shared.js'
 import { buildComment } from '../comment.js'
@@ -31,6 +32,7 @@ export async function onRequest(context) {
     const q = context.request.query || {}
     const academic = S.academic()
     const store = S.ai()
+    const scope = await buildScope(context)
 
     if (method === 'GET') {
       let studentId = q.studentId ? num(q.studentId, 0) : 0
@@ -40,6 +42,7 @@ export async function onRequest(context) {
       }
       const term = String(q.term || q.semester || '').trim() || currentSemester()
       if (!studentId) return json(fail('studentId 不能为空', 400))
+      if (!scope.filterFn({ studentId })) return json(ok(null))
       const doc = await store.get(keyOf(studentId, term), { type: 'json' })
       return json(ok(!doc || doc.deleted === 1 ? null : doc))
     }
@@ -50,6 +53,9 @@ export async function onRequest(context) {
       const term = String(pick(body, 'term', 'semester') || '').trim() || currentSemester()
       const student = await academic.get(`students/${studentId}.json`, { type: 'json' })
       if (!student || student.deleted === 1) return json(fail('学生档案不存在', 400))
+      if (!scope.filterFn({ studentId, classId: student.classId, grade: student.grade })) {
+        return json(fail('无权为该学生生成评语', 403), 403)
+      }
       const generateAi = body.generateAi === true || body.generateAi === 1 || body.generateAi === 'true'
       const existing = await store.get(keyOf(studentId, term), { type: 'json' })
       let aiDraft = ''

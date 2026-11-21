@@ -2,6 +2,7 @@
 import { S, ok, fail, json, bodyOf, now } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
 import { val, num, strip, requirePermission } from '../../_lib/util.js'
+import { teacherNameByUserId } from '../../_lib/teacher.js'
 import { normalizeWalking } from './_walking.js'
 
 const validStage = (v) => [1, 2, 3].includes(num(v, 0))
@@ -32,11 +33,9 @@ export async function onRequest(context) {
       if (body.stage !== undefined && !validStage(stage)) return json(fail('学段不合法（1=小学 2=初中 3=高中）', 400))
       if (body.grade !== undefined && !validGrade(grade)) return json(fail('年级不合法（1-12）', 400))
       const headTeacherId = body.headTeacherId !== undefined ? val(body.headTeacherId, null) : doc.headTeacherId
-      let headTeacherName = doc.headTeacherName || ''
-      if (body.headTeacherId !== undefined) {
-        const t = headTeacherId !== null ? await store.get(`teachers/${headTeacherId}.json`, { type: 'json' }) : null
-        headTeacherName = t?.realName || ''
-      }
+      const headTeacherName = body.headTeacherId !== undefined
+        ? await teacherNameByUserId(store, headTeacherId, body.headTeacherName)
+        : (doc.headTeacherName || '')
       const walk = normalizeWalking(body, doc)
       if (walk.error) return json(fail(walk.error, 400))
       await store.setJSON(key, {

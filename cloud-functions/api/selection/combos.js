@@ -2,6 +2,7 @@
 import { S, ok, fail, json } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
 import { requirePermission, num } from '../../_lib/util.js'
+import { buildScope, applyScope } from '../../_lib/scope.js'
 import { COMBOS } from './_shared.js'
 
 export async function onRequest(context) {
@@ -13,18 +14,20 @@ export async function onRequest(context) {
     const grade = q.grade ? num(q.grade, 0) : 0
     const semester = q.semester ? String(q.semester).trim() : ''
 
-    // 年级学生总数
+    const scope = await buildScope(context)
+
+    // 年级学生总数（先按 scope 收窄，再按 grade 过滤）
     const academic = S.academic()
     const { blobs: sBlobs } = await academic.list({ prefix: 'students/' })
     const students = await Promise.all(sBlobs.map((b) => academic.get(b.key, { type: 'json' })))
-    const totalStudents = students.filter((s) =>
-      s && s.deleted !== 1 && (!grade || num(s.grade, 0) === grade)
-    ).length
+    const totalStudents = applyScope(students, scope, { studentField: 'id' })
+      .filter((s) => s && s.deleted !== 1 && (!grade || num(s.grade, 0) === grade))
+      .length
 
-    // 已提交意愿（status=1，未删）按 combo 聚合
+    // 已提交意愿（status=1，未删）按 combo 聚合，同样受 scope 约束
     const store = S.selection()
     const { blobs } = await store.list({ prefix: 'intents/' })
-    const intents = (await Promise.all(blobs.map((b) => store.get(b.key, { type: 'json' }))))
+    const intents = applyScope((await Promise.all(blobs.map((b) => store.get(b.key, { type: 'json' })))), scope)
       .filter((x) => x && x.deleted !== 1 && num(x.status, 1) === 1)
       .filter((x) => (!grade || num(x.grade, 0) === grade))
       .filter((x) => (!semester || String(x.semester || '') === semester))

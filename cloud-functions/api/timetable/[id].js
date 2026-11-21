@@ -2,7 +2,7 @@
 import { S, ok, fail, json, bodyOf, now } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
 import { requirePermission, num, strip } from '../../_lib/util.js'
-import { ownStudentClassId } from './_shared.js'
+import { buildScope } from '../../_lib/scope.js'
 
 export async function onRequest(context) {
   try {
@@ -10,6 +10,7 @@ export async function onRequest(context) {
     const method = context.request.method
     const guard = await requirePermission(context, method === 'GET' ? 'timetable:list' : 'timetable:edit')
     if (guard instanceof Response) return guard
+    const scope = await buildScope(context)
     const id = num(String(context.params?.id || '').replace(/\D/g, ''), 0)
     if (!id) return json(fail('课表 id 无效', 400))
     const store = S.timetable()
@@ -18,11 +19,8 @@ export async function onRequest(context) {
 
     if (method === 'GET') {
       if (!doc || doc.deleted === 1) return json(ok(null))
-      // 学生端防御：只能看本人本班课表
-      if (Number(guard.userType) === 1) {
-        const ownClassId = await ownStudentClassId(guard, S.academic())
-        if (!ownClassId || num(doc.classId, 0) !== ownClassId) return json(ok(null))
-      }
+      // 五级 scope：学生只能看本人本班，教师只能看所带/任教班，组长看管辖年级
+      if (!scope.filterFn(doc, { by: 'class' })) return json(ok(null))
       const { blobs } = await store.list({ prefix: 'slots/' })
       const all = await Promise.all(blobs.map((b) => store.get(b.key, { type: 'json' })))
       const slots = all
@@ -32,6 +30,7 @@ export async function onRequest(context) {
       return json(ok({ ...strip(doc), slots }))
     }
     if (!doc || doc.deleted === 1) return json(ok(null))
+    if (!scope.filterFn(doc, { by: 'class' })) return json(fail('无权操作该课表', 403), 403)
 
     if (method === 'PUT') {
       const body = await bodyOf(context.request)

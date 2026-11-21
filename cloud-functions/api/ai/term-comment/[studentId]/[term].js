@@ -2,6 +2,7 @@
 import { S, ok, fail, json, bodyOf, now } from '../../../../_lib/store.js'
 import { ensureSeeded } from '../../../../_lib/seed.js'
 import { requirePermission, num } from '../../../../_lib/util.js'
+import { buildScope } from '../../../../_lib/scope.js'
 
 export async function onRequest(context) {
   try {
@@ -11,6 +12,8 @@ export async function onRequest(context) {
     const studentId = num(String(context.params?.studentId || '').replace(/\D/g, ''), 0)
     const term = String(context.params?.term || '').trim()
     if (!studentId || !term) return json(fail('studentId 与 term 不能为空', 400))
+    const scope = await buildScope(context)
+    if (!scope.filterFn({ studentId })) return json(fail('无权操作该评语', 403), 403)
     const method = context.request.method
     const store = S.ai()
     const key = `term-comments/${studentId}/${term}.json`

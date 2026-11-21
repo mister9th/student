@@ -2,6 +2,7 @@
 import { S, ok, fail, json } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
 import { requirePermission, num, pagedOrdered, stripRecords } from '../../_lib/util.js'
+import { buildScope } from '../../_lib/scope.js'
 import { ownStudentClassId } from './_shared.js'
 
 export async function onRequest(context) {
@@ -21,10 +22,12 @@ export async function onRequest(context) {
     const semester = q.semester ? String(q.semester).trim() : ''
     const type = q.type ? String(q.type).trim() : ''
 
+    const scope = await buildScope(context)
     const filter = (x) =>
       (!classId || num(x.classId, 0) === classId) &&
       (!semester || String(x.semester || '') === semester) &&
-      (!type || String(x.type || '') === type)
+      (!type || String(x.type || '') === type) &&
+      scope.filterFn(x)
 
     return json(ok(stripRecords(await pagedOrdered(S.timetable(), 'tables/', q, filter, false))))
   } catch (e) {

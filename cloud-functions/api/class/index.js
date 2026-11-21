@@ -2,6 +2,7 @@
 import { S, ok, fail, json, bodyOf, nextId, now } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
 import { val, num, requirePermission } from '../../_lib/util.js'
+import { teacherNameByUserId } from '../../_lib/teacher.js'
 import { normalizeWalking } from './_walking.js'
 
 export async function onRequest(context) {
@@ -19,11 +20,8 @@ export async function onRequest(context) {
     const store = S.academic()
     const id = await nextId(store, 'classes/')
     const headTeacherId = val(body.headTeacherId, null)
-    let headTeacherName = ''
-    if (headTeacherId !== null) {
-      const t = await store.get(`teachers/${headTeacherId}.json`, { type: 'json' })
-      headTeacherName = t?.realName || ''
-    }
+    // headTeacherId = user.id，按 userId 反查教师档案
+    const headTeacherName = await teacherNameByUserId(store, headTeacherId, body.headTeacherName)
     const walk = normalizeWalking(body, null)
     if (walk.error) return json(fail(walk.error, 400))
     const ts = now()

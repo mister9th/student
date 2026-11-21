@@ -1,8 +1,9 @@
 /** GET /api/score/page（单考次模型过滤；P1 §4.2 年级组长按 manageGrades 经班级 grade 强制过滤） */
 import { S, ok, fail, json } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
-import { pagedOrdered, stripRecords, num, currentUser, requirePermission } from '../../_lib/util.js'
+import { pagedOrdered, stripRecords, requirePermission } from '../../_lib/util.js'
 import { loadScoreJoinMaps, overlayScoreFields } from '../../_lib/score-join.js'
+import { buildScope } from '../../_lib/scope.js'
 
 export async function onRequest(context) {
   try {
@@ -22,26 +23,12 @@ export async function onRequest(context) {
       (!semester || String(x.semester || '') === semester) &&
       (!examName || String(x.examName || '').includes(examName))
 
-    const user = await currentUser(context)
     const guard = await requirePermission(context, 'score:list')
     if (guard instanceof Response) return guard
-    if (user && Number(user.userType) === 4) {
-      const grades = Array.isArray(user.manageGrades) ? user.manageGrades.map(Number).filter(Number.isFinite) : []
-      const gs = new Set(grades)
-      const base = filter
-      if (!gs.size) {
-        filter = () => false
-      } else {
-        // 成绩文档无 grade 字段：经班级档案 classId -> grade 映射
-        const academic = S.academic()
-        const { blobs } = await academic.list({ prefix: 'classes/' })
-        const classes = await Promise.all(blobs.map((b) => academic.get(b.key, { type: 'json' })))
-        const classIds = new Set(classes
-          .filter((c) => c && c.deleted !== 1 && gs.has(Number(c.grade)))
-          .map((c) => num(c.id, 0)))
-        filter = (x) => (classIds.has(Number(x.classId)) || gs.has(Number(x.grade))) && base(x)
-      }
-    }
+    // K12-P4 §3.2：五级 scope 统一过滤；前端 classId/studentId/subjectId 只作收窄
+    const scope = await buildScope(context)
+    const base = filter
+    filter = (x) => base(x) && scope.filterFn(x)
     const paged = await pagedOrdered(S.academic(), 'scores/', q, filter, true)
     // 读时联表：权限过滤完成后，用权威文档覆盖成绩冗余展示字段（不改原文档、不写库）
     const maps = await loadScoreJoinMaps()

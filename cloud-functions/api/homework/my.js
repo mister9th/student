@@ -2,6 +2,7 @@
 import { S, ok, fail, json } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
 import { requirePermission, num, pagedOrdered, stripRecords } from '../../_lib/util.js'
+import { buildScope } from '../../_lib/scope.js'
 import { ownStudentProfile } from './_shared.js'
 
 export async function onRequest(context) {
@@ -26,14 +27,16 @@ export async function onRequest(context) {
     }
     const classId = profile ? num(profile.classId, 0) : -1
     const semester = q.semester ? String(q.semester).trim() : ''
+    const scope = await buildScope(context)
 
-    // 取该班全部已发布作业（status=1）；强制本人班级
+    // 取该班全部已发布作业（status=1）；强制本人班级 + scope 过滤
     const listAll = await pagedOrdered(store, 'assignments/', { page: 1, pageSize: 500 },
-      (a) => num(a.classId, 0) === classId && num(a.status, 1) === 1 && (!semester || String(a.semester || '') === semester), false)
-    // 该学生在该班的提交
+      (a) => num(a.classId, 0) === classId && num(a.status, 1) === 1 &&
+        (!semester || String(a.semester || '') === semester) && scope.filterFn(a), false)
+    // 该学生在该班的提交（同样受 scope 约束）
     const { blobs } = await store.list({ prefix: 'submissions/' })
     const subs = await Promise.all(blobs.map((b) => store.get(b.key, { type: 'json' })))
-    const mySubs = subs.filter((s) => s && s.deleted !== 1 && num(s.studentId, 0) === studentId)
+    const mySubs = subs.filter((s) => s && s.deleted !== 1 && num(s.studentId, 0) === studentId && scope.filterFn(s))
 
     const records = listAll.records.map((a) => {
       const sub = mySubs.find((s) => num(s.assignmentId, 0) === num(a.id, 0)) || null

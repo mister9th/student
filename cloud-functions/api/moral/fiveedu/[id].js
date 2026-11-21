@@ -2,6 +2,7 @@
 import { S, ok, fail, json, bodyOf, now } from '../../../_lib/store.js'
 import { ensureSeeded } from '../../../_lib/seed.js'
 import { requirePermission, num } from '../../../_lib/util.js'
+import { buildScope } from '../../../_lib/scope.js'
 import { DIMENSIONS, scoreOf, applyFiveEduDelta, rebuildFiveEdu } from './_fiveedu.js'
 
 const parseTags = (v) => (Array.isArray(v)
@@ -21,6 +22,8 @@ export async function onRequest(context) {
     const key = `fiveedu/${id}.json`
     const doc = await store.get(key, { type: 'json' })
     if (!doc || doc.deleted === 1) return json(ok(null))
+    const scope = await buildScope(context)
+    if (!scope.filterFn(doc)) return json(fail('无权操作该五育记录', 403), 403)
 
     if (method === 'DELETE') {
       // 先软删记录，再全量重算该生 fiveEdu（只汇总未删除记录）

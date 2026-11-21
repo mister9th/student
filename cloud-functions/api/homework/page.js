@@ -2,6 +2,7 @@
 import { S, ok, fail, json } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
 import { requirePermission, num, pagedOrdered, stripRecords } from '../../_lib/util.js'
+import { buildScope } from '../../_lib/scope.js'
 import { ownStudentProfile, submissionStatsOf } from './_shared.js'
 
 export async function onRequest(context) {
@@ -24,12 +25,14 @@ export async function onRequest(context) {
     const title = q.title ? String(q.title).trim() : ''
     const status = q.status !== undefined && q.status !== '' && q.status !== null ? num(q.status, -1) : -1
 
+    const scope = await buildScope(context)
     const filter = (x) =>
       (!classId || num(x.classId, 0) === classId) &&
       (!subjectId || num(x.subjectId, 0) === subjectId) &&
       (!semester || String(x.semester || '') === semester) &&
       (status === -1 || num(x.status, 1) === status) &&
-      (!title || String(x.title || '').includes(title))
+      (!title || String(x.title || '').includes(title)) &&
+      scope.filterFn(x)
 
     const result = await pagedOrdered(store, 'assignments/', q, filter, false)
     const records = await Promise.all(result.records.map(async (a) => ({

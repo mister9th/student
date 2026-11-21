@@ -2,6 +2,7 @@
 import { S, ok, fail, json, bodyOf, now } from '../../../_lib/store.js'
 import { ensureSeeded } from '../../../_lib/seed.js'
 import { requirePermission, num, strip } from '../../../_lib/util.js'
+import { buildScope } from '../../../_lib/scope.js'
 
 export async function onRequest(context) {
   try {
@@ -13,9 +14,15 @@ export async function onRequest(context) {
     const store = S.moral()
     const key = `records/${id}.json`
     const doc = await store.get(key, { type: 'json' })
+    const scope = await buildScope(context)
 
-    if (method === 'GET') return json(ok(!doc || doc.deleted === 1 ? null : strip(doc)))
+    if (method === 'GET') {
+      if (!doc || doc.deleted === 1) return json(ok(null))
+      if (!scope.filterFn(doc)) return json(ok(null))
+      return json(ok(strip(doc)))
+    }
     if (!doc || doc.deleted === 1) return json(ok(null))
+    if (!scope.filterFn(doc)) return json(fail('无权操作该德育记录', 403), 403)
 
     if (method === 'DELETE') {
       await store.setJSON(key, { ...doc, deleted: 1, updateTime: now() })

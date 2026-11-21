@@ -2,6 +2,8 @@
 import { S, ok, fail, json, bodyOf, now } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
 import { num, k12GradeOf, currentSemester, strip, requirePermission } from '../../_lib/util.js'
+import { loadTeachings, findTeachingTeacherId } from '../../_lib/score-join.js'
+import { buildScope } from '../../_lib/scope.js'
 
 const pad2 = (n) => String(n).padStart(2, '0')
 const today = () => {
@@ -16,12 +18,19 @@ export async function onRequest(context) {
     const method = context.request.method
     const guard = await requirePermission(context, method === 'GET' ? 'score:list' : 'score:edit')
     if (guard instanceof Response) return guard
+    const scope = await buildScope(context)
     const store = S.academic()
     const key = `scores/${id}.json`
     const doc = await store.get(key, { type: 'json' })
 
-    if (method === 'GET') return json(ok(!doc || doc.deleted === 1 ? null : strip(doc)))
+    if (method === 'GET') {
+      // 学生只能读本人成绩；其余角色按 scope 判定
+      if (!doc || doc.deleted === 1) return json(ok(null))
+      if (!scope.filterFn(doc)) return json(ok(null))
+      return json(ok(strip(doc)))
+    }
     if (!doc || doc.deleted === 1) return json(ok(null))
+    if (!scope.filterFn(doc)) return json(fail('无权操作该成绩', 403), 403)
 
     if (method === 'DELETE') {
       await store.setJSON(key, { ...doc, deleted: 1, updateTime: now() })
@@ -57,6 +66,15 @@ export async function onRequest(context) {
       const subject = subjectId !== num(doc.subjectId, 0) ? await store.get(`courses/${subjectId}.json`, { type: 'json' }) : null
       const semester = exam ? String(exam.semester || '')
         : (body.semester !== undefined ? String(body.semester || '').trim() : (subject?.semester || doc.semester || currentSemester()))
+      const classId = student ? (student.classId ?? null) : (doc.classId ?? null)
+      // 目标也必须落在 scope 内，防止把成绩改到别的班/科目
+      if (!scope.filterFn({ ...doc, studentId, classId, subjectId, semester })) {
+        return json(fail('无权将成绩改到该学生/科目', 403), 403)
+      }
+      // K12-P4 §2：teacherId 优先授课关系，回退 course.teacherId
+      const taughtTeacherId = findTeachingTeacherId({ teachings: await loadTeachings() }, subjectId, classId, semester)
+      const courseDoc = subject || await store.get(`courses/${subjectId}.json`, { type: 'json' })
+      const teacherId = taughtTeacherId !== null ? taughtTeacherId : (courseDoc?.teacherId ?? doc.teacherId ?? null)
       await store.setJSON(key, {
         ...doc,
         studentId,
@@ -67,7 +85,7 @@ export async function onRequest(context) {
         subjectName: subject ? (subject.courseName || '') : doc.subjectName || '',
         examId, examName, examType, examDate, semester,
         score: rawScore, gradeLevel: k12GradeOf(rawScore),
-        teacherId: subject ? (subject.teacherId ?? null) : doc.teacherId ?? null,
+        teacherId,
         comment: body.comment !== undefined ? String(body.comment || '') : doc.comment || '',
         updateTime: now(),
       })

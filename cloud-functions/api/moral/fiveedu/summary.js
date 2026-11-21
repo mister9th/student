@@ -2,6 +2,7 @@
 import { S, ok, fail, json } from '../../../_lib/store.js'
 import { ensureSeeded } from '../../../_lib/seed.js'
 import { requirePermission, currentUser, num } from '../../../_lib/util.js'
+import { buildScope } from '../../../_lib/scope.js'
 import { DIMENSIONS, ownStudentId } from './_fiveedu.js'
 
 export async function onRequest(context) {
@@ -22,6 +23,11 @@ export async function onRequest(context) {
     if (!studentId) return json(fail('studentId 不能为空', 400))
 
     const student = await academic.get(`students/${studentId}.json`, { type: 'json' })
+    // scope 校验：只能查看自己权限范围内的学生汇总
+    const scope = await buildScope(context)
+    if (!scope.filterFn({ studentId, classId: student?.classId, grade: student?.grade })) {
+      return json(ok(null))
+    }
     const store = S.moral()
     const { blobs } = await store.list({ prefix: 'fiveedu/' })
     const docs = await Promise.all(blobs.map((b) => store.get(b.key, { type: 'json' })))

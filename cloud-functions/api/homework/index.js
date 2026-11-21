@@ -2,6 +2,7 @@
 import { S, ok, fail, json, bodyOf, nextId, now } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
 import { requirePermission, num } from '../../_lib/util.js'
+import { buildScope } from '../../_lib/scope.js'
 import { normalizeAssignment, notifyClassStudents } from './_shared.js'
 import { writeOperLog } from '../../_lib/oper-log.js'
 
@@ -14,6 +15,11 @@ export async function onRequest(context) {
     const body = await bodyOf(context.request)
     const { error, data } = normalizeAssignment(body, null)
     if (error) return json(fail(error, 400))
+    // K12-P4 §3.2：教师只能对自己所带班/任教科目发布作业
+    const scope = await buildScope(context)
+    if (!scope.filterFn({ classId: data.classId, subjectId: data.subjectId })) {
+      return json(fail('无权向该班级/科目发布作业', 403), 403)
+    }
 
     const academic = S.academic()
     const cls = await academic.get(`classes/${data.classId}.json`, { type: 'json' })

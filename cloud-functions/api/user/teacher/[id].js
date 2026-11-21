@@ -2,7 +2,7 @@
 import bcrypt from 'bcryptjs'
 import { S, ok, fail, json, bodyOf, ensureUnique, now } from '../../../_lib/store.js'
 import { ensureSeeded } from '../../../_lib/seed.js'
-import { enc, num, strip, requirePermission } from '../../../_lib/util.js'
+import { enc, num, strip, permsOf, roleOf, requirePermission } from '../../../_lib/util.js'
 
 export async function onRequest(context) {
   try {
@@ -51,6 +51,21 @@ export async function onRequest(context) {
       if (body.email !== undefined) next.email = String(body.email || '')
       if (body.phone !== undefined) next.phone = String(body.phone || '')
       if (body.gender !== undefined) next.gender = num(body.gender, 0)
+
+      // K12-P4 §5.1：年级组长设置。未传新值时沿用档案现值（编辑表单回显场景）
+      const truthy = (v) => v === true || v === 1 || v === '1' || v === 'true'
+      const wasLeader = num(doc.userType, 0) === 4 || doc.isGradeLeader === true
+      const isGradeLeader = body.isGradeLeader !== undefined ? truthy(body.isGradeLeader) : wasLeader
+      const gradesRaw = body.manageGrades !== undefined ? body.manageGrades : doc.manageGrades
+      const manageGrades = Array.isArray(gradesRaw)
+        ? [...new Set(gradesRaw.map(Number).filter((g) => Number.isInteger(g) && g >= 1 && g <= 12))]
+        : []
+      if (isGradeLeader && !manageGrades.length) return json(fail('年级组长须指定管辖年级（1-12）', 400))
+      const userType = isGradeLeader ? 4 : 2
+      next.userType = userType
+      next.isGradeLeader = isGradeLeader
+      if (isGradeLeader) next.manageGrades = manageGrades
+      else delete next.manageGrades
       next.updateTime = now()
       await academic.setJSON(key, next)
 
@@ -62,6 +77,12 @@ export async function onRequest(context) {
         if (body.phone !== undefined) u.phone = next.phone
         if (body.gender !== undefined) u.gender = next.gender
         if (body.password) u.password = bcrypt.hashSync(String(body.password), 10)
+        // roles/permissions 整体重置（不取并集），4→2 时清 manageGrades，避免组长权限快照残留
+        u.userType = userType
+        u.roles = [roleOf(userType)]
+        u.permissions = permsOf(userType)
+        if (isGradeLeader) u.manageGrades = manageGrades
+        else delete u.manageGrades
         u.updateTime = now()
         await auth.setJSON(`users/${doc.userId}.json`, u)
       }

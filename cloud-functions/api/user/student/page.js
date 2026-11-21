@@ -1,7 +1,8 @@
 /** GET /api/user/student/page（P1 §4.2：年级组长按 manageGrades 强制过滤） */
 import { S, ok, fail, json } from '../../../_lib/store.js'
 import { ensureSeeded } from '../../../_lib/seed.js'
-import { pagedOrdered, stripRecords, currentUser, requirePermission } from '../../../_lib/util.js'
+import { pagedOrdered, stripRecords, requirePermission } from '../../../_lib/util.js'
+import { buildScope } from '../../../_lib/scope.js'
 import { loadClassesMap, overlayStudentClassFields } from '../../../_lib/score-join.js'
 
 export async function onRequest(context) {
@@ -13,22 +14,12 @@ export async function onRequest(context) {
     let filter = (x) =>
       (!name || String(x.realName || '').includes(name)) &&
       (!no || String(x.studentNo || '').includes(no))
-    // 年级组长（userType=4）：按 manageGrades 强制过滤，manageGrades 为空则列表为空；其他角色零影响
-    const user = await currentUser(context)
     const guard = await requirePermission(context, 'student:list')
     if (guard instanceof Response) return guard
-    // 学生查询只返回本人一条；与下方年级组长过滤互斥，互不影响
-    if (user && Number(user.userType) === 1) {
-      const selfId = Number(user.id ?? user.userId)
-      const base = filter
-      filter = (x) => Number(x.userId) === selfId && base(x)
-    }
-    if (user && Number(user.userType) === 4) {
-      const grades = Array.isArray(user.manageGrades) ? user.manageGrades.map(Number).filter(Number.isFinite) : []
-      const gs = new Set(grades)
-      const base = filter
-      filter = (x) => gs.has(Number(x.grade)) && base(x)
-    }
+    // K12-P4 §3.2：五级 scope 统一过滤（学生档案用 id 作为 studentId 判定）
+    const scope = await buildScope(context)
+    const base = filter
+    filter = (x) => base(x) && scope.filterFn(x, { studentField: 'id' })
     const paged = await pagedOrdered(S.academic(), 'students/', q, filter, true)
     // 班级名以班级档案为权威：按 classId 读时覆盖，班级文档缺失时保留学生文档原值
     const classes = await loadClassesMap()

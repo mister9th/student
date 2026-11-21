@@ -1,7 +1,8 @@
 /** GET /api/class/page（K12：className 模糊 + stage/grade 过滤；P1 §4.2 年级组长按 manageGrades 强制过滤） */
 import { S, ok, fail, json } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
-import { pagedOrdered, stripRecords, num, currentUser, requirePermission } from '../../_lib/util.js'
+import { pagedOrdered, stripRecords, num, requirePermission } from '../../_lib/util.js'
+import { buildScope } from '../../_lib/scope.js'
 
 export async function onRequest(context) {
   try {
@@ -19,15 +20,12 @@ export async function onRequest(context) {
       (!grade || Number(x.grade) === grade) &&
       (isWalking === -1 || num(x.isWalking, 0) === isWalking) &&
       (!subjectCombo || String(x.subjectCombo || '') === subjectCombo)
-    const user = await currentUser(context)
     const guard = await requirePermission(context, 'class:list')
     if (guard instanceof Response) return guard
-    if (user && Number(user.userType) === 4) {
-      const grades = Array.isArray(user.manageGrades) ? user.manageGrades.map(Number).filter(Number.isFinite) : []
-      const gs = new Set(grades)
-      const base = filter
-      filter = (x) => gs.has(Number(x.grade)) && base(x)
-    }
+    // K12-P4 §3.2：管理员全量 / 组长本年级 / 教师所带任教班 / 学生本班
+    const scope = await buildScope(context)
+    const base = filter
+    filter = (x) => base(x) && scope.filterFn(x, { by: 'class', classField: 'id' })
     return json(ok(stripRecords(await pagedOrdered(S.academic(), 'classes/', q, filter, true))))
   } catch (e) {
     return json(fail(e?.message || '查询班级失败', 500))

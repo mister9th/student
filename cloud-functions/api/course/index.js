@@ -2,6 +2,7 @@
 import { S, ok, fail, json, bodyOf, nextId, now } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
 import { val, num, requirePermission } from '../../_lib/util.js'
+import { teacherNameByUserId } from '../../_lib/teacher.js'
 
 export async function onRequest(context) {
   try {
@@ -16,16 +17,14 @@ export async function onRequest(context) {
     const store = S.academic()
     const id = await nextId(store, 'courses/')
     const teacherId = val(body.teacherId, null)
-    let teacherName = ''
-    if (teacherId !== null) {
-      const t = await store.get(`teachers/${teacherId}.json`, { type: 'json' })
-      teacherName = t?.realName || ''
-    }
+    // teacherId = user.id，按 userId 在 teachers/ 反查；不再用 teachers/${teacherId}.json
+    const teacherName = await teacherNameByUserId(store, teacherId, body.teacherName)
     const ts = now()
     await store.setJSON(`courses/${id}.json`, {
       id, courseName, teacherId, teacherName, stage,
       gradeScope: String(body.gradeScope || ''), semester: String(body.semester || ''),
-      maxStudent: num(body.maxStudent, 100), status: num(body.status, 0),
+      // K12-P4 §1.1：容量口径归 class.maxStudent；保留字段兼容但不再从 body 接收
+      maxStudent: 100, status: num(body.status, 0),
       createTime: ts, updateTime: ts, deleted: 0,
     })
     return json(ok({ id }))
