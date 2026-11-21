@@ -7,6 +7,7 @@
 import { S, ok, fail, json, now } from '../../_lib/store.js'
 import { ensureSeeded, GRADE_LEADER_USERS, buildUserDoc } from '../../_lib/seed.js'
 import { requirePermission } from '../../_lib/util.js'
+import { writeOperLog } from '../../_lib/oper-log.js'
 
 export async function onRequest(context) {
   try {
@@ -52,6 +53,7 @@ export async function onRequest(context) {
       await auth.setJSON(`username/${enc}`, { createdAt: Date.now() }, { onlyIfNew: true })
       created.push(def.username)
     }
+    await writeOperLog(context, { module: '用户管理', operation: '建年级组长账号' })
     return json(ok({ created, skipped }))
   } catch (e) {
     return json(fail(e?.message || '年级组长建号迁移失败', 500))

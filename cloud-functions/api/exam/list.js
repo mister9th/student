@@ -1,12 +1,15 @@
 /** GET /api/exam/list —— 全量考试下拉（P1 §1.4） */
 import { S, ok, fail, json } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
-import { requirePermission, num } from '../../_lib/util.js'
+import { currentUser, requirePermission, num } from '../../_lib/util.js'
 
 export async function onRequest(context) {
   try {
     await ensureSeeded()
-    const guard = await requirePermission(context, 'exam:list')
+    // 学生排名弹窗也需要考试下拉：学生用 score:list 放行，教师仍用 exam:list
+    const user = await currentUser(context)
+    const isStudent = !!user && Number(user.userType) === 1
+    const guard = await requirePermission(context, isStudent ? 'score:list' : 'exam:list')
     if (guard instanceof Response) return guard
     const q = context.request.query || {}
     const stage = q.stage ? num(q.stage, 0) : 0

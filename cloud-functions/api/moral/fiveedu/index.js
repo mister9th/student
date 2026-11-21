@@ -3,6 +3,7 @@ import { S, ok, fail, json, bodyOf, nextId, now } from '../../../_lib/store.js'
 import { ensureSeeded } from '../../../_lib/seed.js'
 import { requirePermission, num } from '../../../_lib/util.js'
 import { DIMENSIONS, scoreOf, applyFiveEduDelta, rebuildFiveEdu } from './_fiveedu.js'
+import { writeOperLog } from '../../../_lib/oper-log.js'
 
 export async function onRequest(context) {
   try {
@@ -40,6 +41,7 @@ export async function onRequest(context) {
     })
     // 全量重算汇总（写新记录后重算，保证五育分值始终与未删除记录一致）
     const fiveEdu = await rebuildFiveEdu(academic, studentId)
+    await writeOperLog(context, { module: '五育管理', operation: '新增五育记录' })
     return json(ok({ id, fiveEdu }))
   } catch (e) {
     return json(fail(e?.message || '五育打标失败', 500))

@@ -127,8 +127,13 @@ export async function currentUser(context) {
 export async function requirePermission(context, permCode) {
   const user = await currentUser(context)
   if (!user) return json(fail('未登录', 401), 401)
-  const perms = Array.isArray(user.permissions) ? user.permissions : []
-  if (perms.includes('*:*') || perms.includes(permCode)) return user
+  // 与 /auth/me 口径一致：用户文档 permissions 快照 ∪ 角色静态权限 permsOf(userType)。
+  // 存量用户的快照是旧版本种下的，新增模块权限码不在其中；取并集可让新权限自动生效，
+  // 无需 migrate-permissions 或重新登录，同时保留快照里的自定义权限。
+  const snapshot = Array.isArray(user.permissions) ? user.permissions : []
+  const rolePerms = permsOf(user.userType) || []
+  const effective = new Set([...snapshot, ...rolePerms])
+  if (effective.has('*:*') || effective.has(permCode)) return user
   return json(fail('无权限', 403), 403)
 }
 

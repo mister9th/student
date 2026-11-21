@@ -5,6 +5,7 @@ import { currentUser, requirePermission, num } from '../../../_lib/util.js'
 import { currentSemester } from '../../../_lib/k12.js'
 import { pick } from '../_shared.js'
 import { buildComment } from '../comment.js'
+import { writeOperLog } from '../../../_lib/oper-log.js'
 
 const keyOf = (studentId, term) => `term-comments/${studentId}/${term}.json`
 
@@ -84,6 +85,7 @@ export async function onRequest(context) {
       }
       // key 即 term，覆盖写保证同生同学期只有一份
       await store.setJSON(keyOf(studentId, term), doc)
+      await writeOperLog(context, { module: '学期评语', operation: '生成或保存评语' })
       return json(ok({ studentId, term, id: doc.id }))
     }
     return json(fail('方法不允许', 405))

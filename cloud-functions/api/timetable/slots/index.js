@@ -3,6 +3,7 @@ import { S, ok, fail, json, bodyOf, nextId, now } from '../../../_lib/store.js'
 import { ensureSeeded } from '../../../_lib/seed.js'
 import { requirePermission, num } from '../../../_lib/util.js'
 import { normalizeSlot, checkConflicts } from '../_shared.js'
+import { writeOperLog } from '../../../_lib/oper-log.js'
 
 export async function onRequest(context) {
   try {
@@ -62,6 +63,7 @@ export async function onRequest(context) {
       await Promise.all(writeJobs.slice(i, i + 30).map((fn) => fn()))
     }
     await store.setJSON(key, { ...table, updateTime: ts })
+    await writeOperLog(context, { module: '课表管理', operation: '编排课表' })
     return json(ok({ id, slots: candidates.length }))
   } catch (e) {
     return json(fail(e?.message || '保存课表课时失败', 500))

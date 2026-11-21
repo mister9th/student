@@ -3,6 +3,7 @@ import { S, ok, fail, json, bodyOf, nextId, now } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
 import { requirePermission, num } from '../../_lib/util.js'
 import { normalizeTable } from './_shared.js'
+import { writeOperLog } from '../../_lib/oper-log.js'
 
 export async function onRequest(context) {
   try {
@@ -42,6 +43,7 @@ export async function onRequest(context) {
       updateTime: ts,
       deleted: 0,
     })
+    await writeOperLog(context, { module: '课表管理', operation: '新建课表' })
     return json(ok({ id, classId: data.classId, semester: data.semester, type: data.type, subjectCombo: data.subjectCombo, status: data.status }))
   } catch (e) {
     return json(fail(e?.message || '创建课表失败', 500))

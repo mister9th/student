@@ -2,6 +2,7 @@
 import { S, ok, fail, json, bodyOf, nextId, now } from '../../../_lib/store.js'
 import { ensureSeeded } from '../../../_lib/seed.js'
 import { requirePermission, num, pagedOrdered, stripRecords } from '../../../_lib/util.js'
+import { ownStudentId } from '../fiveedu/_fiveedu.js'
 
 export async function onRequest(context) {
   try {
@@ -13,7 +14,11 @@ export async function onRequest(context) {
 
     if (method === 'GET') {
       const q = context.request.query || {}
-      const studentId = q.studentId ? Number(q.studentId) : null
+      let studentId = q.studentId ? Number(q.studentId) : null
+      if (Number(guard.userType) === 1) {
+        // 学生强制只看本人记录；未找到本人档案时用 -1 保证结果为空，不退回全校
+        studentId = (await ownStudentId(guard, S.academic())) || -1
+      }
       const status = q.status ? String(q.status) : ''
       const category = q.category ? String(q.category) : ''
       const filter = (x) =>

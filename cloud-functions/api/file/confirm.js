@@ -7,13 +7,14 @@
  */
 import { S, ok, fail, json, bodyOf, nextId, now } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
-import { enc, extOf, contentTypeOf, num, requirePermission } from '../../_lib/util.js'
+import { enc, extOf, contentTypeOf, num, currentUser } from '../../_lib/util.js'
 
 export async function onRequest(context) {
   try {
     await ensureSeeded()
-    const guard = await requirePermission(context, 'file')
-    if (guard instanceof Response) return guard
+    // 与 get-upload-url 对齐：上传确认只需登录，不检查 file 码
+    const guard = await currentUser(context)
+    if (!guard) return json(fail('未登录', 401), 401)
     const body = await bodyOf(context.request)
     const key = String(body.key || body.fileKey || '').replace(/^\/+/, '')
     if (!key) return json(fail('缺少文件 key', 400), 400)

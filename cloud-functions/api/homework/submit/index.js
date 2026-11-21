@@ -3,6 +3,7 @@ import { S, ok, fail, json, bodyOf, nextId, now } from '../../../_lib/store.js'
 import { ensureSeeded } from '../../../_lib/seed.js'
 import { requirePermission, num } from '../../../_lib/util.js'
 import { ownStudentProfile, isLateOf } from '../_shared.js'
+import { writeOperLog } from '../../../_lib/oper-log.js'
 
 export async function onRequest(context) {
   try {
@@ -70,6 +71,7 @@ export async function onRequest(context) {
       updateTime: ts,
       deleted: 0,
     })
+    await writeOperLog(context, { module: '作业管理', operation: '提交作业' })
     return json(ok({ id, status: 'submitted' }))
   } catch (e) {
     return json(fail(e?.message || '提交作业失败', 500))

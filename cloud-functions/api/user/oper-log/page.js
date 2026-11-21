@@ -6,7 +6,9 @@ import { stripRecords, requirePermission } from '../../../_lib/util.js'
 export async function onRequest(context) {
   try {
     await ensureSeeded()
-    const guard = await requirePermission(context, 'dashboard')
+    // 口径说明：前端菜单用 operlog:list（权限表无此码，前端改为 system:config），
+    // 后端统一用 system:config（仅管理员），避免学生凭 dashboard 越权看全校日志。
+    const guard = await requirePermission(context, 'system:config')
     if (guard instanceof Response) return guard
     const q = context.request.query || {}
     const module = q.module ? String(q.module).trim() : ''

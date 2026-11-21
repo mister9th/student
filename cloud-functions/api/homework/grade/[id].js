@@ -2,6 +2,7 @@
 import { S, ok, fail, json, bodyOf, now } from '../../../_lib/store.js'
 import { ensureSeeded } from '../../../_lib/seed.js'
 import { requirePermission, num, k12GradeOf } from '../../../_lib/util.js'
+import { writeOperLog } from '../../../_lib/oper-log.js'
 
 export async function onRequest(context) {
   try {
@@ -30,6 +31,7 @@ export async function onRequest(context) {
       gradedTime: ts,
       updateTime: ts,
     })
+    await writeOperLog(context, { module: '作业管理', operation: '批改作业' })
     return json(ok({ id: submissionId, status: 'graded', score, gradeLevel: k12GradeOf(score) }))
   } catch (e) {
     return json(fail(e?.message || '批改作业失败', 500))

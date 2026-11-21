@@ -3,6 +3,7 @@ import { S, ok, fail, json, bodyOf, nextId, now } from '../../../_lib/store.js'
 import { ensureSeeded } from '../../../_lib/seed.js'
 import { requirePermission, num, pagedOrdered, stripRecords } from '../../../_lib/util.js'
 import { ownStudentProfile, normalizeIntent } from '../_shared.js'
+import { writeOperLog } from '../../../_lib/oper-log.js'
 
 export async function onRequest(context) {
   try {
@@ -65,6 +66,7 @@ export async function onRequest(context) {
         createTime: old?.createTime || ts,
         updateTime: ts,
       })
+      await writeOperLog(context, { module: '选科管理', operation: '提交选科意愿' })
       return json(ok({ id, combo: data.combo, semester: data.semester }))
     }
     return json(fail('方法不允许', 405))

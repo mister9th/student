@@ -3,6 +3,7 @@ import { S, ok, fail, json, bodyOf, now } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
 import { requirePermission, num, strip } from '../../_lib/util.js'
 import { normalizeExam } from './_validate.js'
+import { writeOperLog } from '../../_lib/oper-log.js'
 
 export async function onRequest(context) {
   try {
@@ -26,6 +27,7 @@ export async function onRequest(context) {
       if (error) return json(fail(error, 400))
       // 不可改 id；改 examName 不回填成绩冗余（成绩按 examId 动态取新名）
       await store.setJSON(key, { ...doc, ...data, id, updateTime: now() })
+      await writeOperLog(context, { module: '考试管理', operation: '修改考试' })
       return json(ok(null))
     }
     if (method === 'DELETE') {
@@ -39,6 +41,7 @@ export async function onRequest(context) {
       })
       if (hit) return json(fail('考试下仍有成绩，请先归档', 400))
       await store.setJSON(key, { ...doc, deleted: 1, updateTime: now() })
+      await writeOperLog(context, { module: '考试管理', operation: '删除考试' })
       return json(ok(null))
     }
     return json(fail('方法不允许', 405))

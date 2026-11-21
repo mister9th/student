@@ -16,6 +16,12 @@ export async function onRequest(context) {
     const user = await currentUser(context)
     const guard = await requirePermission(context, 'student:list')
     if (guard instanceof Response) return guard
+    // 学生查询只返回本人一条；与下方年级组长过滤互斥，互不影响
+    if (user && Number(user.userType) === 1) {
+      const selfId = Number(user.id ?? user.userId)
+      const base = filter
+      filter = (x) => Number(x.userId) === selfId && base(x)
+    }
     if (user && Number(user.userType) === 4) {
       const grades = Array.isArray(user.manageGrades) ? user.manageGrades.map(Number).filter(Number.isFinite) : []
       const gs = new Set(grades)

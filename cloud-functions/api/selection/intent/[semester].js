@@ -3,6 +3,7 @@ import { S, ok, fail, json, now } from '../../../_lib/store.js'
 import { ensureSeeded } from '../../../_lib/seed.js'
 import { requirePermission, num } from '../../../_lib/util.js'
 import { ownStudentProfile } from '../_shared.js'
+import { writeOperLog } from '../../../_lib/oper-log.js'
 
 export async function onRequest(context) {
   try {
@@ -30,6 +31,7 @@ export async function onRequest(context) {
     if (doc && doc.deleted !== 1) {
       await store.setJSON(`intents/${id}.json`, { ...doc, status: 0, deleted: 1, updateTime: now() })
     }
+    await writeOperLog(context, { module: '选科管理', operation: '撤回选科' })
     return json(ok(null))
   } catch (e) {
     return json(fail(e?.message || '撤回选科意愿失败', 500))

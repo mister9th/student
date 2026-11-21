@@ -8,7 +8,7 @@
  */
 import { S, ok, fail, json, bodyOf, nextId, now } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
-import { enc, extOf, num, requirePermission } from '../../_lib/util.js'
+import { enc, extOf, num, currentUser } from '../../_lib/util.js'
 
 // P3：业务类型白名单（作业附件 businessType='homework'）。未知类型归一为 other，保持向后兼容。
 const ALLOWED_BUSINESS_TYPES = new Set([
@@ -18,8 +18,9 @@ const ALLOWED_BUSINESS_TYPES = new Set([
 export async function onRequest(context) {
   try {
     await ensureSeeded()
-    const guard = await requirePermission(context, 'file')
-    if (guard instanceof Response) return guard
+    // 上传端点只需登录：学生无 file 码但要能传头像/作业附件；列表与删除仍由 file 码管控
+    const guard = await currentUser(context)
+    if (!guard) return json(fail('未登录', 401), 401)
     const body = await bodyOf(context.request)
     const fileName = String(body.fileName || body.name || 'upload')
     let businessType = String(body.businessType || body.business_type || 'other')
