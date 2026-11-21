@@ -2,6 +2,7 @@
 import { S, ok, fail, json } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
 import { pagedOrdered, stripRecords, num, currentUser, requirePermission } from '../../_lib/util.js'
+import { loadScoreJoinMaps, overlayScoreFields } from '../../_lib/score-join.js'
 
 export async function onRequest(context) {
   try {
@@ -41,7 +42,11 @@ export async function onRequest(context) {
         filter = (x) => (classIds.has(Number(x.classId)) || gs.has(Number(x.grade))) && base(x)
       }
     }
-    return json(ok(stripRecords(await pagedOrdered(S.academic(), 'scores/', q, filter, true))))
+    const paged = await pagedOrdered(S.academic(), 'scores/', q, filter, true)
+    // 读时联表：权限过滤完成后，用权威文档覆盖成绩冗余展示字段（不改原文档、不写库）
+    const maps = await loadScoreJoinMaps()
+    const records = (paged.records || []).map((r) => overlayScoreFields(r, maps))
+    return json(ok(stripRecords({ ...paged, records })))
   } catch (e) {
     return json(fail(e?.message || '查询成绩失败', 500))
   }

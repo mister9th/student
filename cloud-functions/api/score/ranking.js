@@ -5,6 +5,7 @@
 import { S, ok, fail, json } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
 import { currentUser, requirePermission, num } from '../../_lib/util.js'
+import { loadScoreJoinMaps, overlayScoreFields } from '../../_lib/score-join.js'
 
 /** 学生用户 -> 学生档案 id（student.userId === user.id），找不到返回 0 */
 async function ownStudentId(user, academic) {
@@ -91,6 +92,15 @@ export async function onRequest(context) {
         gradeLevel: String(s.gradeLevel || ''),
         totalScore: score,
       })
+    }
+
+    // 读时联表：排序/剥离前用权威文档覆盖展示字段（学生/课程改名、换班后仍显示最新值）
+    const maps = await loadScoreJoinMaps()
+    for (const r of rows) {
+      const over = overlayScoreFields(r, maps)
+      r.studentName = over.studentName
+      r.className = over.className
+      r.subjectName = over.subjectName
     }
 
     // dense rank：同分同名次、名次连续（1,1,2,3...）
