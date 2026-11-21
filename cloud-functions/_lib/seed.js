@@ -115,12 +115,6 @@ const roleOf = (userType) => (
 const permsOf = (userType) => ROLE_PERMISSIONS[roleOf(userType)]
 const pad2 = (n) => String(n).padStart(2, '0')
 
-/** P1：2 名年级组长演示用户定义（seed 与 ensure-grade-leaders 迁移共用的唯一来源） */
-export const GRADE_LEADER_USERS = [
-  { id: 3001, username: 'gradeleader1', realName: '李年级(初一)', userType: 4, email: 'gradeleader1@deyu.edu.cn', phone: '13800003001', gender: 1, manageGrades: [7, 8, 9] },
-  { id: 3002, username: 'gradeleader2', realName: '王年级(高一)', userType: 4, email: 'gradeleader2@deyu.edu.cn', phone: '13800003002', gender: 2, manageGrades: [10, 11, 12] },
-]
-
 /** 由账号定义构造用户文档（seed 与迁移端点共用，保证字段/口令/权限完全一致） */
 export function buildUserDoc(o) {
   return {
@@ -267,8 +261,6 @@ async function writeSeed() {
   addUser({ id: 1, username: 'admin', realName: '系统管理员', userType: 3, email: 'admin@deyu.edu.cn', phone: '13800000000', gender: 1 })
   addUser({ id: 1100, username: 'stu_zs', realName: '张三丰', userType: 1, email: 'stu_zs@stu.deyu.edu.cn', phone: '13900010001', gender: 1 })
   addUser({ id: 2100, username: 'zhangsan', realName: '张三', userType: 2, email: 'zhangsan@deyu.edu.cn', phone: '13800001001', gender: 1 })
-  // P1：2 名年级组长演示用户（定义来自 GRADE_LEADER_USERS，迁移端点复用同一来源）
-  GRADE_LEADER_USERS.forEach(addUser)
 
   teacherNames.forEach((name, i) => {
     addUser({

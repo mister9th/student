@@ -17,9 +17,12 @@ async function docsOf(storeObj, prefix) {
   return docs.filter((d) => d && d.deleted !== 1)
 }
 
-/** 读记录字段：opts.<name>Field 可覆盖默认字段名；空值视为不存在 */
+/** 读记录字段：opts[name] 或 opts[name+'Field'] 可覆盖默认字段名；空值视为不存在
+ *  P4 后续修复：调用方既有传 class/student（早期端点），也有传 classField/studentField
+ *  （class/page、student/page 等），两种都要支持，否则班级/学生文档只有 id 无 classId 会被全过滤 */
 function fieldOf(record, opts, name, defaultName) {
-  const key = opts && opts[name] ? opts[name] : defaultName
+  const override = opts && (opts[name] || opts[name + 'Field'])
+  const key = override || defaultName
   const v = record ? record[key] : undefined
   return v === undefined || v === null || v === '' ? null : v
 }
