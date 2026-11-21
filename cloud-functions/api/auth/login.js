@@ -51,6 +51,8 @@ export async function onRequest(context) {
       userType: Number(user.userType),
       roles,
       permissions,
+      // P7：年级组长的管辖年级，供前端收窄"按年级发消息"等选择范围
+      ...(Number(user.userType) === 4 && Array.isArray(user.manageGrades) ? { manageGrades: user.manageGrades } : {}),
       menus: [],
     }))
   } catch (e) {

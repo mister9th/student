@@ -26,6 +26,8 @@ export async function onRequest(context) {
       userType: num(user.userType, 3),
       roles,
       permissions,
+      // P7：年级组长管辖年级，供前端收窄选择范围（Token 刷新后仍有效）
+      ...(num(user.userType, 3) === 4 && Array.isArray(user.manageGrades) ? { manageGrades: user.manageGrades } : {}),
     }))
   } catch (e) {
     return json(fail(e?.message || '获取用户信息失败', 500))
