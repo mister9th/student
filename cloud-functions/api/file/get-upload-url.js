@@ -10,12 +10,18 @@ import { S, ok, fail, json, bodyOf, nextId, now } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
 import { currentUser, enc, extOf, num } from '../../_lib/util.js'
 
+// P3：业务类型白名单（作业附件 businessType='homework'）。未知类型归一为 other，保持向后兼容。
+const ALLOWED_BUSINESS_TYPES = new Set([
+  'other', 'avatar', 'homework', 'notice', 'message', 'score', 'moral', 'selection',
+])
+
 export async function onRequest(context) {
   try {
     await ensureSeeded()
     const body = await bodyOf(context.request)
     const fileName = String(body.fileName || body.name || 'upload')
-    const businessType = String(body.businessType || body.business_type || 'other')
+    let businessType = String(body.businessType || body.business_type || 'other')
+    if (!ALLOWED_BUSINESS_TYPES.has(businessType)) businessType = 'other'
     // 必须与前端 putToPresignedUrl 发送的 Content-Type 完全一致，否则 Blob 返回 403
     const contentType = String(body.contentType || body.mimeType || '') || 'application/octet-stream'
     const user = await currentUser(context)

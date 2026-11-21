@@ -2,6 +2,7 @@
 import { S, ok, fail, json, bodyOf, nextId, now } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
 import { val, num } from '../../_lib/util.js'
+import { normalizeWalking } from './_walking.js'
 
 export async function onRequest(context) {
   try {
@@ -21,12 +22,16 @@ export async function onRequest(context) {
       const t = await store.get(`teachers/${headTeacherId}.json`, { type: 'json' })
       headTeacherName = t?.realName || ''
     }
+    const walk = normalizeWalking(body, null)
+    if (walk.error) return json(fail(walk.error, 400))
     const ts = now()
     await store.setJSON(`classes/${id}.json`, {
       id, className, stage, grade,
       headTeacherId, headTeacherName, monitorId: null, studentCount: 0,
       maxStudent: num(body.maxStudent, 50), status: num(body.status, 1),
-      enrollmentYear: val(body.enrollmentYear, null), createTime: ts, updateTime: ts, deleted: 0,
+      enrollmentYear: val(body.enrollmentYear, null),
+      ...walk.data,
+      createTime: ts, updateTime: ts, deleted: 0,
     })
     return json(ok({ id }))
   } catch (e) {

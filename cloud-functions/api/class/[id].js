@@ -2,6 +2,7 @@
 import { S, ok, fail, json, bodyOf, now } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
 import { val, num, strip } from '../../_lib/util.js'
+import { normalizeWalking } from './_walking.js'
 
 const validStage = (v) => [1, 2, 3].includes(num(v, 0))
 const validGrade = (v) => num(v, 0) >= 1 && num(v, 0) <= 12
@@ -34,6 +35,8 @@ export async function onRequest(context) {
         const t = headTeacherId !== null ? await store.get(`teachers/${headTeacherId}.json`, { type: 'json' }) : null
         headTeacherName = t?.realName || ''
       }
+      const walk = normalizeWalking(body, doc)
+      if (walk.error) return json(fail(walk.error, 400))
       await store.setJSON(key, {
         ...doc,
         className: body.className !== undefined ? String(body.className || '') : doc.className,
@@ -42,6 +45,7 @@ export async function onRequest(context) {
         maxStudent: body.maxStudent !== undefined ? num(body.maxStudent, 50) : doc.maxStudent,
         status: body.status !== undefined ? num(body.status, 1) : doc.status,
         enrollmentYear: body.enrollmentYear !== undefined ? val(body.enrollmentYear, null) : doc.enrollmentYear,
+        ...walk.data,
         updateTime: now(),
       })
       return json(ok(null))

@@ -65,6 +65,12 @@ export const ROLE_PERMISSIONS = {
     'exam', 'exam:list', 'exam:add', 'exam:edit', 'exam:delete',
     'fiveedu', 'fiveedu:list', 'fiveedu:add', 'fiveedu:edit',
     'termcomment', 'termcomment:list', 'termcomment:add', 'termcomment:edit',
+    // P3 新增：作业管理 / 选科走班 / 课表（课表权限码先补齐，第二批再实现端点）
+    'homework', 'homework:list', 'homework:add', 'homework:edit', 'homework:delete', 'homework:grade',
+    'selection', 'selection:list', 'selection:add', 'selection:edit',
+    'assignment', 'assignment:list', 'assignment:add', 'assignment:edit', 'assignment:delete',
+    'assign-score',
+    'timetable', 'timetable:list', 'timetable:add', 'timetable:edit', 'timetable:delete',
   ],
   ROLE_GRADE_LEADER: [
     'dashboard', 'dashboard:screen', 'student', 'student:list', 'student:add', 'student:edit',
@@ -80,11 +86,19 @@ export const ROLE_PERMISSIONS = {
     'exam', 'exam:list', 'exam:add', 'exam:edit', 'exam:delete',
     'fiveedu', 'fiveedu:list', 'fiveedu:add', 'fiveedu:edit',
     'termcomment', 'termcomment:list', 'termcomment:add', 'termcomment:edit',
+    // P3 新增：与 ROLE_TEACHER 对齐（作业/选科/课表全套）
+    'homework', 'homework:list', 'homework:add', 'homework:edit', 'homework:delete', 'homework:grade',
+    'selection', 'selection:list', 'selection:add', 'selection:edit',
+    'assignment', 'assignment:list', 'assignment:add', 'assignment:edit', 'assignment:delete',
+    'assign-score',
+    'timetable', 'timetable:list', 'timetable:add', 'timetable:edit', 'timetable:delete',
     'grade-leader',
   ],
   ROLE_STUDENT: [
     'dashboard', 'dashboard:screen', 'ai', 'ai:chat', 'message', 'message:list', 'student:list', 'score:list',
     'moral', 'moral:list', 'fiveedu:list', 'termcomment:list',
+    // P3 新增：学生只读/提交项（列表均由服务端强制过滤到本人/本班）
+    'homework:list', 'homework:submit', 'selection:list', 'selection:add', 'selection:edit', 'timetable:list',
   ],
 }
 export const permsOf = (userType) => ROLE_PERMISSIONS[roleOf(userType)]

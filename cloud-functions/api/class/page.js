@@ -10,10 +10,15 @@ export async function onRequest(context) {
     const name = q.className ? String(q.className).trim() : ''
     const stage = q.stage ? num(q.stage, 0) : 0
     const grade = q.grade ? num(q.grade, 0) : 0
+    // P3 §2.5：走班班过滤（与 stage/grade、P1 manageGrades 过滤叠加）
+    const isWalking = q.isWalking !== undefined && q.isWalking !== '' && q.isWalking !== null ? num(q.isWalking, -1) : -1
+    const subjectCombo = q.subjectCombo ? String(q.subjectCombo).trim() : ''
     let filter = (x) =>
       (!name || String(x.className || '').includes(name)) &&
       (!stage || Number(x.stage) === stage) &&
-      (!grade || Number(x.grade) === grade)
+      (!grade || Number(x.grade) === grade) &&
+      (isWalking === -1 || num(x.isWalking, 0) === isWalking) &&
+      (!subjectCombo || String(x.subjectCombo || '') === subjectCombo)
     const user = await currentUser(context)
     if (user && Number(user.userType) === 4) {
       const grades = Array.isArray(user.manageGrades) ? user.manageGrades.map(Number).filter(Number.isFinite) : []
