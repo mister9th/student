@@ -8,7 +8,7 @@ export async function onRequest(context) {
   try {
     await ensureSeeded()
     const method = context.request.method
-    const guard = await requirePermission(context, method === 'GET' ? 'timetable:list' : 'timetable:edit')
+    const guard = await requirePermission(context, method === 'GET' ? 'timetable:list' : method === 'DELETE' ? 'timetable:delete' : 'timetable:edit')
     if (guard instanceof Response) return guard
     const scope = await buildScope(context)
     const id = num(String(context.params?.id || '').replace(/\D/g, ''), 0)

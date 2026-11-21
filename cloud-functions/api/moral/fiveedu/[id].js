@@ -12,11 +12,12 @@ const parseTags = (v) => (Array.isArray(v)
 export async function onRequest(context) {
   try {
     await ensureSeeded()
-    const guard = await requirePermission(context, 'fiveedu:edit')
+    const method = context.request.method
+    // DELETE 用独立 :delete 码；GET/PUT 保持原 fiveedu:edit 语义（契约 §2.2）
+    const guard = await requirePermission(context, method === 'DELETE' ? 'fiveedu:delete' : 'fiveedu:edit')
     if (guard instanceof Response) return guard
     const id = num(String(context.params?.id || '').replace(/\D/g, ''), 0)
     if (!id) return json(fail('记录 id 无效', 400))
-    const method = context.request.method
     const store = S.moral()
     const academic = S.academic()
     const key = `fiveedu/${id}.json`

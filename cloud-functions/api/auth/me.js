@@ -1,7 +1,7 @@
 /** GET /api/auth/me —— 从 JWT 取身份并回查用户文档 */
 import { ok, fail, json } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
-import { currentUser, roleOf, permsOf, num } from '../../_lib/util.js'
+import { currentUser, roleOf, resolveEffectivePermissions, num } from '../../_lib/util.js'
 
 export async function onRequest(context) {
   try {
@@ -9,11 +9,8 @@ export async function onRequest(context) {
     const user = await currentUser(context)
     if (!user) return json(fail('未登录或登录已过期', 401))
     const roles = Array.isArray(user.roles) && user.roles.length ? user.roles : [roleOf(user.userType)]
-    // 与 login.js 保持一致：旧快照补齐角色权限，避免德育等新模块按钮不渲染。
-    const permissions = Array.from(new Set([
-      ...(Array.isArray(user.permissions) ? user.permissions : []),
-      ...(permsOf(user.userType) || []),
-    ]))
+    // 与 login.js / requirePermission 统一口径（唯一实现在 permissions.js）
+    const permissions = await resolveEffectivePermissions(user)
     return json(ok({
       id: user.id,
       userId: user.id,

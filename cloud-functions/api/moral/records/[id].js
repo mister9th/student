@@ -8,7 +8,7 @@ export async function onRequest(context) {
   try {
     await ensureSeeded()
     const method = context.request.method
-    const guard = await requirePermission(context, method === 'GET' ? 'moral:list' : 'moral:edit')
+    const guard = await requirePermission(context, method === 'GET' ? 'moral:list' : method === 'DELETE' ? 'moral:delete' : 'moral:edit')
     if (guard instanceof Response) return guard
     const id = String(context.params?.id || '').replace(/\D/g, '')
     const store = S.moral()

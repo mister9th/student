@@ -2,6 +2,11 @@
  * 云函数公共小工具（仅依赖 _lib/store.js 与已声明依赖）
  */
 import { S, fail, json, verifyToken, jwtSecret, pageOf } from './store.js'
+import { resolveEffectivePermissions } from './permissions.js'
+// 权限相关实现统一收敛到 permissions.js（唯一真相源），此处仅 re-export，消除两份分叉副本
+export { roleOf, permsOf, resolveRoleCodes, loadRolePermissions, resolveEffectivePermissions,
+  DEFAULT_ROLE_PERMISSIONS, ALL_PERMISSION_CODES, PERMISSION_GROUPS, ROLE_DEFS, UNUSED_PERMISSION_CODES
+} from './permissions.js'
 
 export const num = (v, def = 0) => {
   const n = Number(v)
@@ -42,67 +47,6 @@ export const stripRecords = (pagedResult) => {
 
 export const enc = (s) => encodeURIComponent(String(s ?? ''))
 
-export const roleOf = (userType) => (
-  Number(userType) === 4 ? 'ROLE_GRADE_LEADER'
-    : Number(userType) === 2 ? 'ROLE_TEACHER'
-      : Number(userType) === 1 ? 'ROLE_STUDENT'
-        : 'ROLE_ADMIN'
-)
-
-export const ROLE_PERMISSIONS = {
-  ROLE_ADMIN: ['*:*'],
-  ROLE_TEACHER: [
-    'dashboard', 'dashboard:screen', 'student', 'student:list', 'student:add', 'student:edit',
-    'student:import', 'student:export', 'teacher', 'teacher:list', 'teacher:add', 'teacher:edit',
-    'class', 'class:list', 'class:add', 'class:edit', 'course', 'course:list', 'course:add',
-    'course:edit', 'score', 'score:list', 'score:add', 'score:edit', 'score:ranking', 'notice', 'message',
-    'message:list', 'file', 'file:list', 'ai', 'ai:chat',
-    'moral', 'moral:list', 'moral:add', 'moral:edit', 'moral:approve', 'moral:delete',
-    'group', 'group:list', 'group:add', 'group:edit', 'group:delete',
-    'inspection', 'inspection:list', 'inspection:add', 'inspection:edit', 'inspection:delete',
-    'redflag', 'redflag:list', 'redflag:add', 'redflag:edit',
-    'grade', 'grade:list', 'grade:add', 'grade:edit',
-    'exam', 'exam:list', 'exam:add', 'exam:edit', 'exam:delete',
-    'fiveedu', 'fiveedu:list', 'fiveedu:add', 'fiveedu:edit',
-    'termcomment', 'termcomment:list', 'termcomment:add', 'termcomment:edit',
-    // P3 新增：作业管理 / 选科走班 / 课表（课表权限码先补齐，第二批再实现端点）
-    'homework', 'homework:list', 'homework:add', 'homework:edit', 'homework:delete', 'homework:grade',
-    'selection', 'selection:list', 'selection:add', 'selection:edit',
-    'assignment', 'assignment:list', 'assignment:add', 'assignment:edit', 'assignment:delete',
-    'assign-score',
-    'timetable', 'timetable:list', 'timetable:add', 'timetable:edit', 'timetable:delete',
-  ],
-  ROLE_GRADE_LEADER: [
-    'dashboard', 'dashboard:screen', 'student', 'student:list', 'student:add', 'student:edit',
-    'student:import', 'student:export', 'teacher', 'teacher:list', 'teacher:add', 'teacher:edit',
-    'class', 'class:list', 'class:add', 'class:edit', 'course', 'course:list', 'course:add',
-    'course:edit', 'score', 'score:list', 'score:add', 'score:edit', 'score:ranking', 'notice', 'message',
-    'message:list', 'file', 'file:list', 'ai', 'ai:chat',
-    'moral', 'moral:list', 'moral:add', 'moral:edit', 'moral:approve', 'moral:delete',
-    'group', 'group:list', 'group:add', 'group:edit', 'group:delete',
-    'inspection', 'inspection:list', 'inspection:add', 'inspection:edit', 'inspection:delete',
-    'redflag', 'redflag:list', 'redflag:add', 'redflag:edit',
-    'grade', 'grade:list', 'grade:add', 'grade:edit',
-    'exam', 'exam:list', 'exam:add', 'exam:edit', 'exam:delete',
-    'fiveedu', 'fiveedu:list', 'fiveedu:add', 'fiveedu:edit',
-    'termcomment', 'termcomment:list', 'termcomment:add', 'termcomment:edit',
-    // P3 新增：与 ROLE_TEACHER 对齐（作业/选科/课表全套）
-    'homework', 'homework:list', 'homework:add', 'homework:edit', 'homework:delete', 'homework:grade',
-    'selection', 'selection:list', 'selection:add', 'selection:edit',
-    'assignment', 'assignment:list', 'assignment:add', 'assignment:edit', 'assignment:delete',
-    'assign-score',
-    'timetable', 'timetable:list', 'timetable:add', 'timetable:edit', 'timetable:delete',
-    'grade-leader',
-  ],
-  ROLE_STUDENT: [
-    'dashboard', 'dashboard:screen', 'ai', 'ai:chat', 'message', 'message:list', 'student:list', 'score:list',
-    'moral', 'moral:list', 'fiveedu:list', 'termcomment:list',
-    // P3 新增：学生只读/提交项（列表均由服务端强制过滤到本人/本班）
-    'homework:list', 'homework:submit', 'selection:list', 'selection:add', 'selection:edit', 'timetable:list',
-  ],
-}
-export const permsOf = (userType) => ROLE_PERMISSIONS[roleOf(userType)]
-
 /** 从 Bearer header 解析当前用户；无效返回 null */
 export async function currentUser(context) {
   const h = context.request?.headers || {}
@@ -127,13 +71,10 @@ export async function currentUser(context) {
 export async function requirePermission(context, permCode) {
   const user = await currentUser(context)
   if (!user) return json(fail('未登录', 401), 401)
-  // 与 /auth/me 口径一致：用户文档 permissions 快照 ∪ 角色静态权限 permsOf(userType)。
-  // 存量用户的快照是旧版本种下的，新增模块权限码不在其中；取并集可让新权限自动生效，
-  // 无需 migrate-permissions 或重新登录，同时保留快照里的自定义权限。
-  const snapshot = Array.isArray(user.permissions) ? user.permissions : []
-  const rolePerms = permsOf(user.userType) || []
-  const effective = new Set([...snapshot, ...rolePerms])
-  if (effective.has('*:*') || effective.has(permCode)) return user
+  // 唯一口径：以 rbac Blob 角色权限为真相源 + 快照自定义残留，支持撤销（减法）。
+  // 113 处调用点无需改动；保持 await + instanceof Response + 401/403 语义。
+  const effective = await resolveEffectivePermissions(user)
+  if (effective.includes('*:*') || effective.includes(permCode)) return user
   return json(fail('无权限', 403), 403)
 }
 

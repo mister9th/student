@@ -9,7 +9,7 @@ export async function onRequest(context) {
     await ensureSeeded()
     const id = String(context.params?.id || '').replace(/\D/g, '')
     const method = context.request.method
-    const guard = await requirePermission(context, method === 'GET' ? 'teacher:list' : 'teacher:edit')
+    const guard = await requirePermission(context, method === 'GET' ? 'teacher:list' : method === 'DELETE' ? 'teacher:delete' : 'teacher:edit')
     if (guard instanceof Response) return guard
     const auth = S.auth()
     const academic = S.academic()

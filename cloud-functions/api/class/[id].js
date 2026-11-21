@@ -13,7 +13,7 @@ export async function onRequest(context) {
     await ensureSeeded()
     const id = String(context.params?.id || '').replace(/\D/g, '')
     const method = context.request.method
-    const guard = await requirePermission(context, method === 'GET' ? 'class:list' : 'class:edit')
+    const guard = await requirePermission(context, method === 'GET' ? 'class:list' : method === 'DELETE' ? 'class:delete' : 'class:edit')
     if (guard instanceof Response) return guard
     const store = S.academic()
     const key = `classes/${id}.json`

@@ -11,7 +11,7 @@ export async function onRequest(context) {
     await ensureSeeded()
     const id = String(context.params?.id || '').replace(/\D/g, '')
     const method = context.request.method
-    const guard = await requirePermission(context, method === 'GET' ? 'student:list' : 'student:edit')
+    const guard = await requirePermission(context, method === 'GET' ? 'student:list' : method === 'DELETE' ? 'student:delete' : 'student:edit')
     if (guard instanceof Response) return guard
     const scope = await buildScope(context)
     const auth = S.auth()

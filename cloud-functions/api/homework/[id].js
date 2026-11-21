@@ -8,7 +8,7 @@ export async function onRequest(context) {
   try {
     await ensureSeeded()
     const method = context.request.method
-    const guard = await requirePermission(context, method === 'GET' ? 'homework:list' : 'homework:edit')
+    const guard = await requirePermission(context, method === 'GET' ? 'homework:list' : method === 'DELETE' ? 'homework:delete' : 'homework:edit')
     if (guard instanceof Response) return guard
     const id = num(String(context.params?.id || '').replace(/\D/g, ''), 0)
     if (!id) return json(fail('作业 id 无效', 400))

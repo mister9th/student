@@ -2,7 +2,7 @@
 import bcrypt from 'bcryptjs'
 import { S, ok, fail, json, bodyOf, signToken, jwtSecret } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
-import { enc, roleOf, permsOf } from '../../_lib/util.js'
+import { enc, roleOf, resolveEffectivePermissions } from '../../_lib/util.js'
 
 export async function onRequest(context) {
   try {
@@ -26,13 +26,9 @@ export async function onRequest(context) {
     }
 
     const roles = Array.isArray(user.roles) && user.roles.length ? user.roles : [roleOf(user.userType)]
-    // 用户文档里的 permissions 是登录时写入的快照，新增模块（如 moral:*）
-    // 不会自动出现在旧快照中。这里与角色权限取并集，保证老用户重新登录后
-    // 立即获得新模块权限，同时保留可能存在的自定义权限。
-    const permissions = Array.from(new Set([
-      ...(Array.isArray(user.permissions) ? user.permissions : []),
-      ...(permsOf(user.userType) || []),
-    ]))
+    // 统一走 permissions.js 的 effective 计算：rbac Blob 角色权限为准 + 快照自定义残留，
+    // 与 requirePermission / me 同口径；不过期、不丢存量权限，且撤销可即时生效。
+    const permissions = await resolveEffectivePermissions(user)
     const token = await signToken({
       id: user.id,
       userId: user.id,

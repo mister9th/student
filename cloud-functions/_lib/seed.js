@@ -8,6 +8,8 @@
 import bcrypt from 'bcryptjs'
 import { S, now } from './store.js'
 import { k12GradeOf } from './k12.js'
+// 角色/权限定义统一来自 permissions.js（唯一真相源），消除与 util.js 的两份副本
+import { ROLE_DEFS, DEFAULT_ROLE_PERMISSIONS, ALL_PERMISSION_CODES, roleOf, permsOf } from './permissions.js'
 
 const PWD_HASH = bcrypt.hashSync('123456', 10)
 
@@ -25,94 +27,7 @@ const CONFIG_DEFAULTS = {
   maxUploadSize: 100,
 }
 
-const ROLE_DEFS = [
-  { id: 1, roleName: '超级管理员', roleCode: 'ROLE_ADMIN', description: '系统超级管理员', sortOrder: 1 },
-  { id: 2, roleName: '教师', roleCode: 'ROLE_TEACHER', description: '教师角色', sortOrder: 2 },
-  { id: 3, roleName: '学生', roleCode: 'ROLE_STUDENT', description: '学生角色', sortOrder: 3 },
-  { id: 5, roleName: '年级组长', roleCode: 'ROLE_GRADE_LEADER', description: '年段工作+跨班级查看（P1）', sortOrder: 5 },
-]
-
-// 教师 = 教学业务增改 + 查询；学生 = 只读；年级组长（P1）= 教师权限 ∪ 年段工作 ∪ grade-leader
-// 本对象与 _lib/util.js 的 ROLE_PERMISSIONS 全量对齐（契约 §7）；两份必须一致。
-const ROLE_PERMISSIONS = {
-  ROLE_ADMIN: ['*:*'],
-  ROLE_TEACHER: [
-    'dashboard', 'dashboard:screen', 'student', 'student:list', 'student:add', 'student:edit',
-    'student:import', 'student:export', 'teacher', 'teacher:list', 'teacher:add', 'teacher:edit',
-    'class', 'class:list', 'class:add', 'class:edit', 'course', 'course:list', 'course:add',
-    'course:edit', 'score', 'score:list', 'score:add', 'score:edit', 'score:ranking', 'notice', 'message',
-    'message:list', 'file', 'file:list', 'ai', 'ai:chat',
-    'moral', 'moral:list', 'moral:add', 'moral:edit', 'moral:approve', 'moral:delete',
-    'group', 'group:list', 'group:add', 'group:edit', 'group:delete',
-    'inspection', 'inspection:list', 'inspection:add', 'inspection:edit', 'inspection:delete',
-    'redflag', 'redflag:list', 'redflag:add', 'redflag:edit',
-    'grade', 'grade:list', 'grade:add', 'grade:edit',
-    'exam', 'exam:list', 'exam:add', 'exam:edit', 'exam:delete',
-    'fiveedu', 'fiveedu:list', 'fiveedu:add', 'fiveedu:edit',
-    'termcomment', 'termcomment:list', 'termcomment:add', 'termcomment:edit',
-    // P3 新增：作业管理 / 选科走班 / 课表（与 util.js 全量对齐）
-    'homework', 'homework:list', 'homework:add', 'homework:edit', 'homework:delete', 'homework:grade',
-    'selection', 'selection:list', 'selection:add', 'selection:edit',
-    'assignment', 'assignment:list', 'assignment:add', 'assignment:edit', 'assignment:delete',
-    'assign-score',
-    'timetable', 'timetable:list', 'timetable:add', 'timetable:edit', 'timetable:delete',
-  ],
-  ROLE_GRADE_LEADER: [
-    'dashboard', 'dashboard:screen', 'student', 'student:list', 'student:add', 'student:edit',
-    'student:import', 'student:export', 'teacher', 'teacher:list', 'teacher:add', 'teacher:edit',
-    'class', 'class:list', 'class:add', 'class:edit', 'course', 'course:list', 'course:add',
-    'course:edit', 'score', 'score:list', 'score:add', 'score:edit', 'score:ranking', 'notice', 'message',
-    'message:list', 'file', 'file:list', 'ai', 'ai:chat',
-    'moral', 'moral:list', 'moral:add', 'moral:edit', 'moral:approve', 'moral:delete',
-    'group', 'group:list', 'group:add', 'group:edit', 'group:delete',
-    'inspection', 'inspection:list', 'inspection:add', 'inspection:edit', 'inspection:delete',
-    'redflag', 'redflag:list', 'redflag:add', 'redflag:edit',
-    'grade', 'grade:list', 'grade:add', 'grade:edit',
-    'exam', 'exam:list', 'exam:add', 'exam:edit', 'exam:delete',
-    'fiveedu', 'fiveedu:list', 'fiveedu:add', 'fiveedu:edit',
-    'termcomment', 'termcomment:list', 'termcomment:add', 'termcomment:edit',
-    // P3 新增：与 ROLE_TEACHER 对齐（作业/选科/课表全套）
-    'homework', 'homework:list', 'homework:add', 'homework:edit', 'homework:delete', 'homework:grade',
-    'selection', 'selection:list', 'selection:add', 'selection:edit',
-    'assignment', 'assignment:list', 'assignment:add', 'assignment:edit', 'assignment:delete',
-    'assign-score',
-    'timetable', 'timetable:list', 'timetable:add', 'timetable:edit', 'timetable:delete',
-    'grade-leader',
-  ],
-  ROLE_STUDENT: [
-    'dashboard', 'dashboard:screen', 'ai', 'ai:chat', 'message', 'message:list', 'student:list', 'score:list',
-    'moral', 'moral:list', 'fiveedu:list', 'termcomment:list',
-    // P3 新增：学生只读/提交项（列表均由服务端强制过滤到本人/本班）
-    'homework:list', 'homework:submit', 'selection:list', 'selection:add', 'selection:edit', 'timetable:list',
-  ],
-}
-
-const ALL_PERMISSION_CODES = [
-  'dashboard', 'student', 'teacher', 'class', 'course', 'score', 'ai', 'message', 'file', 'system',
-  'dashboard:screen', 'ai:chat', 'student:add', 'student:edit', 'student:delete', 'student:import',
-  'student:export', 'teacher:add', 'teacher:edit', 'teacher:delete', 'class:add', 'class:edit',
-  'class:delete', 'course:add', 'course:edit', 'course:delete', 'score:add', 'score:edit',
-  'score:delete', 'system:config', 'student:list', 'teacher:list', 'class:list', 'course:list',
-  'score:list', 'message:list', 'file:list',
-  'exam', 'exam:list', 'exam:add', 'exam:edit', 'exam:delete', 'score:ranking',
-  'fiveedu', 'fiveedu:list', 'fiveedu:add', 'fiveedu:edit',
-  'grade-leader',
-  'termcomment', 'termcomment:list', 'termcomment:add', 'termcomment:edit',
-  // P3 新增：作业管理 / 选科走班 / 课表（含仅学生项 homework:submit）
-  'homework', 'homework:list', 'homework:add', 'homework:edit', 'homework:delete', 'homework:submit', 'homework:grade',
-  'selection', 'selection:list', 'selection:add', 'selection:edit',
-  'assignment', 'assignment:list', 'assignment:add', 'assignment:edit', 'assignment:delete',
-  'assign-score',
-  'timetable', 'timetable:list', 'timetable:add', 'timetable:edit', 'timetable:delete',
-]
-
-const roleOf = (userType) => (
-  Number(userType) === 4 ? 'ROLE_GRADE_LEADER'
-    : Number(userType) === 2 ? 'ROLE_TEACHER'
-      : Number(userType) === 1 ? 'ROLE_STUDENT'
-        : 'ROLE_ADMIN'
-)
-const permsOf = (userType) => ROLE_PERMISSIONS[roleOf(userType)]
+// 角色定义、默认权限码、完整注册表、roleOf/permsOf 统一来自 _lib/permissions.js（唯一真相源）
 const pad2 = (n) => String(n).padStart(2, '0')
 
 /** 由账号定义构造用户文档（seed 与迁移端点共用，保证字段/口令/权限完全一致） */
@@ -244,7 +159,7 @@ async function writeSeed() {
   // ---- 角色 / RBAC / 权限 ----
   ROLE_DEFS.forEach((r) => {
     add(auth, `roles/${r.roleCode}.json`, r)
-    add(auth, `rbac/${r.roleCode}.json`, { roleCode: r.roleCode, permissionCodes: ROLE_PERMISSIONS[r.roleCode] })
+    add(auth, `rbac/${r.roleCode}.json`, { roleCode: r.roleCode, permissionCodes: DEFAULT_ROLE_PERMISSIONS[r.roleCode] })
   })
   add(auth, 'permissions/all.json', ALL_PERMISSION_CODES)
 

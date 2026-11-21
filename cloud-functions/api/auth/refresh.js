@@ -2,7 +2,7 @@
 import { ok, fail, json, signToken, jwtSecret } from '../../_lib/store.js'
 import { verifyToken } from '../../_lib/store.js'
 import { ensureSeeded } from '../../_lib/seed.js'
-import { currentUser } from '../../_lib/util.js'
+import { currentUser, resolveEffectivePermissions } from '../../_lib/util.js'
 
 export async function onRequest(context) {
   try {
@@ -16,8 +16,12 @@ export async function onRequest(context) {
     const user = await currentUser(context)
     // exp/iat 不能与 expiresIn 同时交给 jwt.sign，必须剔除
     const { iat, exp, nbf, ...rest } = claims
+    // 不再把旧快照里的过期 permissions 写回 JWT，改为写入当前 effective（同 login/me 口径）
+    const permissions = user
+      ? await resolveEffectivePermissions(user)
+      : (Array.isArray(claims.permissions) ? claims.permissions : [])
     const payload = user
-      ? { ...rest, id: user.id, userId: user.id, username: user.username, userType: user.userType, roles: user.roles, permissions: user.permissions }
+      ? { ...rest, id: user.id, userId: user.id, username: user.username, userType: user.userType, roles: user.roles, permissions }
       : rest
     const token = await signToken(payload, jwtSecret(context.env))
     return json(ok({ token }))
